@@ -1,0 +1,326 @@
+const express = require('express');
+const db = require('../config/database');
+const { authenticateToken, requireSubscription } = require('../middleware/auth');
+const { validate, resumeAnalysisSchema } = require('../middleware/validation');
+const fileService = require('../services/fileService');
+const aiService = require('../services/aiService');
+
+const router = express.Router();
+
+// Upload resume
+router.post('/upload', authenticateToken, fileService.getMulterConfig().single('resume'), async (req, res, next) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        error: 'No file uploaded',
+        code: 'NO_FILE'
+      });
+    }
+
+    const { originalname, filename, path, mimetype, size } = req.file;
+    const fileType = fileService.getFileTypeFromMimeType(mimetype);
+
+    // Extract text from file
+    const extractedText = await fileService.extractTextFromFile(path, fileType);
+
+    // Save resume record to database
+    const [resume] = await db('resumes').insert({
+      user_id: req.user.id,
+      original_filename: originalname,
+      file_path: path,
+      file_type: fileType,
+      file_size: size,
+      extracted_text: extractedText,
+      is_processed: true
+    }).returning(['id', 'original_filename', 'file_type', 'file_size', 'created_at']);
+
+    res.status(201).json({
+      message: 'Resume uploaded and processed successfully',
+      resume: {
+        id: resume.id,
+        original_filename: resume.original_filename,
+        file_type: resume.file_type,
+        file_size: resume.file_size,
+        created_at: resume.created_at,
+        text_length: extractedText.length
+      }
+    });
+  } catch (error) {
+    // Clean up uploaded file if processing failed
+    if (req.file) {
+      await fileService.deleteFile(req.file.path);
+    }
+    next(error);
+  }
+});
+
+// Analyze resume
+router.post('/analyze', authenticateToken, validate(resumeAnalysisSchema), async (req, res, next) => {
+  try {
+    const { job_description, target_role, target_company } = req.body;
+    const { resume_id } = req.query;
+
+    if (!resume_id) {
+      return res.status(400).json({
+        error: 'Resume ID is required',
+        code: 'MISSING_RESUME_ID'
+      });
+    }
+
+    // Get resume
+    const resume = await db('resumes')
+      .where('id', resume_id)
+      .where('user_id', req.user.id)
+      .first();
+
+    if (!resume) {
+      return res.status(404).json({
+        error: 'Resume not found',
+        code: 'RESUME_NOT_FOUND'
+      });
+    }
+
+    if (!resume.extracted_text) {
+      return res.status(400).json({
+        error: 'Resume text not available for analysis',
+        code: 'NO_RESUME_TEXT'
+      });
+    }
+
+    // Perform AI analysis
+    const analysisResult = await aiService.analyzeResume(
+      resume.extracted_text,
+      job_description,
+      target_role,
+      target_company
+    );
+
+    // Update resume with analysis results
+    await db('resumes')
+      .where('id', resume_id)
+      .update({
+        analysis_results: {
+          job_description,
+          target_role,
+          target_company,
+          analysis: analysisResult.analysis,
+          timestamp: new Date()
+        }
+      });
+
+    // Log AI request
+    await aiService.logAIRequest(
+      req.user.id,
+      'resume_analysis',
+      { resume_id, job_description, target_role, target_company },
+      { analysis: analysisResult.analysis },
+      analysisResult.tokensUsed,
+      analysisResult.cost
+    );
+
+    res.json({
+      message: 'Resume analysis completed',
+      analysis: analysisResult.analysis,
+      metadata: {
+        tokens_used: analysisResult.tokensUsed,
+        cost: analysisResult.cost,
+        model: analysisResult.model
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Optimize resume
+router.post('/optimize', authenticateToken, requireSubscription('pro'), validate(resumeAnalysisSchema), async (req, res, next) => {
+  try {
+    const { job_description, target_role } = req.body;
+    const { resume_id } = req.query;
+
+    if (!resume_id) {
+      return res.status(400).json({
+        error: 'Resume ID is required',
+        code: 'MISSING_RESUME_ID'
+      });
+    }
+
+    // Get resume
+    const resume = await db('resumes')
+      .where('id', resume_id)
+      .where('user_id', req.user.id)
+      .first();
+
+    if (!resume) {
+      return res.status(404).json({
+        error: 'Resume not found',
+        code: 'RESUME_NOT_FOUND'
+      });
+    }
+
+    if (!resume.extracted_text) {
+      return res.status(400).json({
+        error: 'Resume text not available for optimization',
+        code: 'NO_RESUME_TEXT'
+      });
+    }
+
+    // Perform AI optimization
+    const optimizationResult = await aiService.optimizeResume(
+      resume.extracted_text,
+      job_description,
+      target_role
+    );
+
+    // Log AI request
+    await aiService.logAIRequest(
+      req.user.id,
+      'resume_optimization',
+      { resume_id, job_description, target_role },
+      { optimized_resume: optimizationResult.optimizedResume },
+      optimizationResult.tokensUsed,
+      optimizationResult.cost
+    );
+
+    res.json({
+      message: 'Resume optimization completed',
+      optimized_resume: optimizationResult.optimizedResume,
+      metadata: {
+        tokens_used: optimizationResult.tokensUsed,
+        cost: optimizationResult.cost,
+        model: optimizationResult.model
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Get user's resumes
+router.get('/', authenticateToken, async (req, res, next) => {
+  try {
+    const { page = 1, limit = 10 } = req.query;
+    const offset = (page - 1) * limit;
+
+    const resumes = await db('resumes')
+      .where('user_id', req.user.id)
+      .select('id', 'original_filename', 'file_type', 'file_size', 'is_processed', 'created_at', 'updated_at')
+      .orderBy('created_at', 'desc')
+      .limit(limit)
+      .offset(offset);
+
+    const total = await db('resumes')
+      .where('user_id', req.user.id)
+      .count('* as count')
+      .first();
+
+    res.json({
+      resumes,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: parseInt(total.count),
+        pages: Math.ceil(total.count / limit)
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Get specific resume
+router.get('/:id', authenticateToken, async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const resume = await db('resumes')
+      .where('id', id)
+      .where('user_id', req.user.id)
+      .first();
+
+    if (!resume) {
+      return res.status(404).json({
+        error: 'Resume not found',
+        code: 'RESUME_NOT_FOUND'
+      });
+    }
+
+    // Don't return the full extracted text in list view
+    const { extracted_text, file_path, ...resumeData } = resume;
+
+    res.json({
+      resume: resumeData,
+      has_text: !!extracted_text,
+      text_length: extracted_text ? extracted_text.length : 0
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Get resume text (for analysis)
+router.get('/:id/text', authenticateToken, async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const resume = await db('resumes')
+      .where('id', id)
+      .where('user_id', req.user.id)
+      .select('extracted_text', 'original_filename')
+      .first();
+
+    if (!resume) {
+      return res.status(404).json({
+        error: 'Resume not found',
+        code: 'RESUME_NOT_FOUND'
+      });
+    }
+
+    if (!resume.extracted_text) {
+      return res.status(400).json({
+        error: 'Resume text not available',
+        code: 'NO_RESUME_TEXT'
+      });
+    }
+
+    res.json({
+      text: resume.extracted_text,
+      filename: resume.original_filename
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Delete resume
+router.delete('/:id', authenticateToken, async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const resume = await db('resumes')
+      .where('id', id)
+      .where('user_id', req.user.id)
+      .first();
+
+    if (!resume) {
+      return res.status(404).json({
+        error: 'Resume not found',
+        code: 'RESUME_NOT_FOUND'
+      });
+    }
+
+    // Delete file from filesystem
+    await fileService.deleteFile(resume.file_path);
+
+    // Delete from database
+    await db('resumes').where('id', id).del();
+
+    res.json({
+      message: 'Resume deleted successfully'
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+module.exports = router;

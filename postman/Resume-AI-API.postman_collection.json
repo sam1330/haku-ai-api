@@ -1,0 +1,654 @@
+{
+  "info": {
+    "name": "Resume AI API",
+    "description": "Complete API collection for AI-Powered Resume & Job Application Assistant",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "1.0.0"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{auth_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "auth_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "user_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "resume_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "job_application_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/health",
+          "host": ["{{base_url}}"],
+          "path": ["health"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Register User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('auth_token', response.token);",
+                  "    pm.collectionVariables.set('user_id', response.user.id);",
+                  "    console.log('Auth token saved:', response.token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"test@example.com\",\n  \"password\": \"password123\",\n  \"first_name\": \"John\",\n  \"last_name\": \"Doe\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "register"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Login User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('auth_token', response.token);",
+                  "    pm.collectionVariables.set('user_id', response.user.id);",
+                  "    console.log('Auth token saved:', response.token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"test@example.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "login"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/auth/profile",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "profile"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"first_name\": \"John Updated\",\n  \"last_name\": \"Doe Updated\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/profile",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "profile"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Change Password",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"current_password\": \"password123\",\n  \"new_password\": \"newpassword123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/change-password",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "change-password"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/auth/logout",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "logout"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Resume Management",
+      "item": [
+        {
+          "name": "Upload Resume",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('resume_id', response.resume.id);",
+                  "    console.log('Resume ID saved:', response.resume.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "resume",
+                  "type": "file",
+                  "src": "/path/to/your/resume.pdf",
+                  "description": "Upload a PDF or DOCX resume file"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/resume/upload",
+              "host": ["{{base_url}}"],
+              "path": ["api", "resume", "upload"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Resumes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/resume?page=1&limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "resume"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Resume by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/resume/{{resume_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "resume", "{{resume_id}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Resume Text",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/resume/{{resume_id}}/text",
+              "host": ["{{base_url}}"],
+              "path": ["api", "resume", "{{resume_id}}", "text"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Analyze Resume",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"job_description\": \"We are looking for a Senior Software Engineer with 5+ years of experience in Node.js, React, and PostgreSQL. The ideal candidate should have experience with AI/ML integration, microservices architecture, and cloud deployment. Responsibilities include developing scalable web applications, mentoring junior developers, and collaborating with cross-functional teams.\",\n  \"target_role\": \"Senior Software Engineer\",\n  \"target_company\": \"Tech Corp\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/resume/analyze?resume_id={{resume_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "resume", "analyze"],
+              "query": [
+                {
+                  "key": "resume_id",
+                  "value": "{{resume_id}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Optimize Resume (Pro Only)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"job_description\": \"We are looking for a Senior Software Engineer with 5+ years of experience in Node.js, React, and PostgreSQL. The ideal candidate should have experience with AI/ML integration, microservices architecture, and cloud deployment.\",\n  \"target_role\": \"Senior Software Engineer\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/resume/optimize?resume_id={{resume_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "resume", "optimize"],
+              "query": [
+                {
+                  "key": "resume_id",
+                  "value": "{{resume_id}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Resume",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/resume/{{resume_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "resume", "{{resume_id}}"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Job Applications",
+      "item": [
+        {
+          "name": "Create Job Application",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('job_application_id', response.job_application.id);",
+                  "    console.log('Job Application ID saved:', response.job_application.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"company_name\": \"Tech Corp\",\n  \"position_title\": \"Senior Software Engineer\",\n  \"job_description\": \"We are looking for a Senior Software Engineer with 5+ years of experience in Node.js, React, and PostgreSQL. The ideal candidate should have experience with AI/ML integration, microservices architecture, and cloud deployment.\",\n  \"application_url\": \"https://techcorp.com/careers/senior-software-engineer\",\n  \"application_deadline\": \"2024-02-15T23:59:59Z\",\n  \"notes\": \"Great opportunity with competitive salary and benefits\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/job-application",
+              "host": ["{{base_url}}"],
+              "path": ["api", "job-application"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Job Applications",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/job-application?page=1&limit=10&status=draft",
+              "host": ["{{base_url}}"],
+              "path": ["api", "job-application"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "status",
+                  "value": "draft"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Job Application by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/job-application/{{job_application_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "job-application", "{{job_application_id}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Job Application",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"applied\",\n  \"notes\": \"Applied on 2024-01-15. Waiting for response.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/job-application/{{job_application_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "job-application", "{{job_application_id}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Generate Cover Letter",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tone\": \"professional\",\n  \"length\": \"medium\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/job-application/{{job_application_id}}/cover-letter",
+              "host": ["{{base_url}}"],
+              "path": ["api", "job-application", "{{job_application_id}}", "cover-letter"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Cover Letter",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/job-application/{{job_application_id}}/cover-letter",
+              "host": ["{{base_url}}"],
+              "path": ["api", "job-application", "{{job_application_id}}", "cover-letter"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Job Application",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/job-application/{{job_application_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "job-application", "{{job_application_id}}"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Dashboard",
+      "item": [
+        {
+          "name": "Get Dashboard Overview",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/dashboard/overview",
+              "host": ["{{base_url}}"],
+              "path": ["api", "dashboard", "overview"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get AI Usage Statistics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/dashboard/ai-usage?period=30",
+              "host": ["{{base_url}}"],
+              "path": ["api", "dashboard", "ai-usage"],
+              "query": [
+                {
+                  "key": "period",
+                  "value": "30"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Subscription Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/dashboard/subscription",
+              "host": ["{{base_url}}"],
+              "path": ["api", "dashboard", "subscription"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Recent Activity",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/dashboard/activity?limit=20",
+              "host": ["{{base_url}}"],
+              "path": ["api", "dashboard", "activity"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Error Testing",
+      "item": [
+        {
+          "name": "Test Invalid Registration",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"invalid-email\",\n  \"password\": \"123\",\n  \"first_name\": \"\",\n  \"last_name\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "register"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Test Unauthorized Access",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/resume",
+              "host": ["{{base_url}}"],
+              "path": ["api", "resume"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Test Invalid Resume Upload",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "resume",
+                  "type": "file",
+                  "src": "/path/to/invalid.txt",
+                  "description": "Upload an invalid file type"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/resume/upload",
+              "host": ["{{base_url}}"],
+              "path": ["api", "resume", "upload"]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

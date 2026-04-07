@@ -55,10 +55,10 @@ router.post('/upload', authenticateToken, fileService.getMulterConfig().single('
 });
 
 // Analyze resume
-router.post('/analyze', authenticateToken, validate(resumeAnalysisSchema), async (req, res, next) => {
+router.post('/:resume_id/analyze', authenticateToken, validate(resumeAnalysisSchema), async (req, res, next) => {
   try {
     const { job_description, target_role, target_company } = req.body;
-    const { resume_id } = req.query;
+    const { resume_id } = req.params;
 
     if (!resume_id) {
       return res.status(400).json({
@@ -125,7 +125,8 @@ router.post('/analyze', authenticateToken, validate(resumeAnalysisSchema), async
         tokens_used: analysisResult.tokensUsed,
         cost: analysisResult.cost,
         model: analysisResult.model
-      }
+      },
+      response: analysisResult.response
     });
   } catch (error) {
     next(error);
@@ -204,7 +205,7 @@ router.get('/', authenticateToken, async (req, res, next) => {
 
     const resumes = await db('resumes')
       .where('user_id', req.user.id)
-      .select('id', 'original_filename', 'file_type', 'file_size', 'is_processed', 'created_at', 'updated_at')
+      .select('id', 'original_filename', 'file_type', 'file_size', 'is_processed', 'created_at', 'updated_at', 'analysis_results')
       .orderBy('created_at', 'desc')
       .limit(limit)
       .offset(offset);

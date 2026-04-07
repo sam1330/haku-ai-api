@@ -29,17 +29,34 @@ class AIService {
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
         systemInstruction: {
           role: 'system',
-          parts: [{ text: "You are an expert resume analyst and career coach. Analyze resumes for ATS compatibility, keyword optimization, and overall effectiveness. Provide specific, actionable feedback." }]
+          parts: [{ text: "You are an expert resume analyst and career coach. Analyze resumes for ATS compatibility, keyword optimization, and overall effectiveness. Provide specific, actionable feedback. Be extremely concise. Use bullet points within strings. Limit the overview to 3 sentences. Do not over-extend the response, try to keep it under 500 words." }]
         },
         generationConfig: {
           maxOutputTokens: 2000,
-          temperature: 0.3
-        }
+          temperature: 0.3,
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: 'object',
+            required: ['overview', 'strongPoints', 'weaknesses', 'atsScore'],
+            properties: {
+              overview: { type: 'string' },
+              strongPoints: {
+                type: 'array',
+                items: { type: 'string' }
+              },
+              weaknesses: {
+                type: 'array',
+                items: { type: 'string' }
+              },
+              atsScore: { type: 'number' }
+            }
+          }
+        },
       };
 
       const result = await this.model.generateContent(request);
       const response = await result.response;
-      const analysis = response.candidates[0].content.parts[0].text;
+      const analysis = JSON.parse(response.candidates[0].content.parts[0].text);
 
       const usageMetadata = response.usageMetadata;
       const tokensUsed = (usageMetadata.promptTokenCount || 0) + (usageMetadata.candidatesTokenCount || 0);

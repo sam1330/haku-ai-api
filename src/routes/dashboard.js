@@ -8,6 +8,9 @@ const router = express.Router();
 router.get('/overview', authenticateToken, async (req, res, next) => {
   try {
     const userId = req.user.id;
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
 
     // Get counts for different entities
     const [
@@ -15,7 +18,13 @@ router.get('/overview', authenticateToken, async (req, res, next) => {
       jobApplicationCount,
       recentResumes,
       recentJobApplications,
-      aiRequestStats
+      aiRequestStats,
+      analyzedResumesData,
+      totalAnalyzedCount,
+      appsThisMonth,
+      aiRequestsThisMonth,
+      userData,
+      recentAIRequests
     ] = await Promise.all([
       // Resume count
       db('resumes').where('user_id', userId).count('* as count').first(),
@@ -26,7 +35,7 @@ router.get('/overview', authenticateToken, async (req, res, next) => {
       // Recent resumes (last 5)
       db('resumes')
         .where('user_id', userId)
-        .select('id', 'original_filename', 'file_type', 'created_at')
+        .select('id', 'original_filename', 'file_type', 'created_at', 'analysis_results')
         .orderBy('created_at', 'desc')
         .limit(5),
       
@@ -43,15 +52,102 @@ router.get('/overview', authenticateToken, async (req, res, next) => {
         .where('created_at', '>=', db.raw("NOW() - INTERVAL '30 days'"))
         .select('request_type')
         .count('* as count')
-        .groupBy('request_type')
+        .groupBy('request_type'),
+
+      // Get last 10 analyzed resumes for metrics aggregation
+      db('resumes')
+        .where('user_id', userId)
+        .whereNotNull('analysis_results')
+        .select('analysis_results')
+        .orderBy('created_at', 'desc')
+        .limit(10),
+
+      // Total analyzed resumes count
+      db('resumes')
+        .where('user_id', userId)
+        .whereNotNull('analysis_results')
+        .count('* as count')
+        .first(),
+
+      // Applications this month
+      db('job_applications')
+        .where('user_id', userId)
+        .where('created_at', '>=', startOfMonth)
+        .count('* as count')
+        .first(),
+
+      // AI requests this month
+      db('ai_requests')
+        .where('user_id', userId)
+        .where('created_at', '>=', startOfMonth)
+        .count('* as count')
+        .first(),
+
+      // User subscription info
+      db('users')
+        .where('id', userId)
+        .select('subscription_type', 'subscription_expires_at')
+        .first(),
+
+      // Recent AI requests (for activity feed)
+      db('ai_requests')
+        .where('user_id', userId)
+        .select('id', 'request_type', 'status', 'created_at')
+        .orderBy('created_at', 'desc')
+        .limit(5)
     ]);
 
-    // Get job application status breakdown
-    const statusBreakdown = await db('job_applications')
-      .where('user_id', userId)
-      .select('status')
-      .count('* as count')
-      .groupBy('status');
+    // Process resume metrics
+    let totalScore = 0;
+    const scoreDistribution = { poor: 0, average: 0, good: 0 };
+    const allStrengths = [];
+    const allWeaknesses = [];
+    const recentAnalyses = [];
+
+    analyzedResumesData.forEach(resume => {
+      const results = resume.analysis_results;
+      if (results && results.analysis) {
+        const score = results.analysis.atsScore || 0;
+        totalScore += score;
+
+        // Score buckets
+        if (score < 60) scoreDistribution.poor++;
+        else if (score < 80) scoreDistribution.average++;
+        else scoreDistribution.good++;
+
+        // Collect strengths and weaknesses
+        if (Array.isArray(results.analysis.strongPoints)) {
+          allStrengths.push(...results.analysis.strongPoints);
+        }
+        if (Array.isArray(results.analysis.weaknesses)) {
+          allWeaknesses.push(...results.analysis.weaknesses);
+        }
+
+        // Add to recent analyses list
+        recentAnalyses.push({
+          target_role: results.target_role,
+          target_company: results.target_company,
+          score: score,
+          timestamp: results.timestamp
+        });
+      }
+    });
+
+    const avgScore = analyzedResumesData.length > 0 
+      ? Math.round(totalScore / analyzedResumesData.length) 
+      : 0;
+
+    // Helper to get top frequencies
+    const getTopItems = (arr, limit = 5) => {
+      const counts = arr.reduce((acc, item) => {
+        acc[item] = (acc[item] || 0) + 1;
+        return acc;
+      }, {});
+      return Object.entries(counts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, limit)
+        .map(([name]) => name);
+    };
 
     // Calculate total AI costs for the month
     const monthlyCosts = await db('ai_requests')
@@ -60,26 +156,50 @@ router.get('/overview', authenticateToken, async (req, res, next) => {
       .sum('cost as total_cost')
       .first();
 
+    // Create a flattened activity feed
+    const activities = [
+      ...recentResumes.map(resume => ({
+        type: 'resume_upload',
+        id: resume.id,
+        description: `Uploaded resume: ${resume.original_filename}`,
+        timestamp: resume.created_at,
+        has_analysis: !!resume.analysis_results
+      })),
+      ...recentJobApplications.map(app => ({
+        type: 'job_application',
+        id: app.id,
+        description: `Applied to ${app.position_title} at ${app.company_name}`,
+        status: app.status,
+        timestamp: app.created_at
+      })),
+      ...recentAIRequests.map(req => ({
+        type: 'ai_request',
+        id: req.id,
+        description: `AI ${req.request_type.replace('_', ' ')} ${req.status}`,
+        timestamp: req.created_at
+      }))
+    ].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+     .slice(0, 10);
+
     res.json({
       overview: {
         total_resumes: parseInt(resumeCount.count),
-        total_job_applications: parseInt(jobApplicationCount.count),
-        monthly_ai_cost: parseFloat(monthlyCosts.total_cost) || 0
+        total_applications: parseInt(jobApplicationCount.count),
+        analyzed_count: parseInt(totalAnalyzedCount.count),
+        avg_score: avgScore,
+        monthly_cost: parseFloat(monthlyCosts.total_cost) || 0,
+        applications_this_month: parseInt(appsThisMonth.count),
+        ai_requests_this_month: parseInt(aiRequestsThisMonth.count)
       },
-      recent_activity: {
-        resumes: recentResumes,
-        job_applications: recentJobApplications
+      resume_analytics: {
+        score_distribution: scoreDistribution,
+        top_strengths: getTopItems(allStrengths),
+        top_weaknesses: getTopItems(allWeaknesses),
+        recent_analyses: recentAnalyses
       },
-      job_application_status: statusBreakdown.reduce((acc, item) => {
-        acc[item.status] = parseInt(item.count);
-        return acc;
-      }, {}),
-      ai_usage: {
-        last_30_days: aiRequestStats.reduce((acc, item) => {
-          acc[item.request_type] = parseInt(item.count);
-          return acc;
-        }, {})
-      }
+      recent_activity: activities,
+      subscription_status: userData.subscription_type,
+      subscription_expires_at: userData.subscription_expires_at
     });
   } catch (error) {
     next(error);

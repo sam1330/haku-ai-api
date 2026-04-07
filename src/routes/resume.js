@@ -95,18 +95,17 @@ router.post('/:resume_id/analyze', authenticateToken, validate(resumeAnalysisSch
       target_company
     );
 
-    // Update resume with analysis results
-    await db('resumes')
-      .where('id', resume_id)
-      .update({
-        analysis_results: {
-          job_description,
-          target_role,
-          target_company,
-          analysis: analysisResult.analysis,
-          timestamp: new Date()
-        }
-      });
+    // Save analysis results to the new table
+    const [analysis] = await db('resume_analysis')
+      .insert({
+        resume_id: resume_id,
+        user_id: req.user.id,
+        target_role: target_role,
+        target_company: target_company,
+        job_description: job_description,
+        analysis_results: analysisResult.analysis
+      })
+      .returning('*');
 
     // Log AI request
     await aiService.logAIRequest(
@@ -205,10 +204,25 @@ router.get('/', authenticateToken, async (req, res, next) => {
 
     const resumes = await db('resumes')
       .where('user_id', req.user.id)
-      .select('id', 'original_filename', 'file_type', 'file_size', 'is_processed', 'created_at', 'updated_at', 'analysis_results')
+      .select('id', 'original_filename', 'file_type', 'file_size', 'is_processed', 'created_at', 'updated_at')
       .orderBy('created_at', 'desc')
       .limit(limit)
       .offset(offset);
+
+    // Fetch the latest analysis for each resume
+    const resumeIds = resumes.map(r => r.id);
+    const latestAnalyses = await db('resume_analysis')
+      .whereIn('resume_id', resumeIds)
+      .orderBy('created_at', 'desc');
+
+    // Map latest analysis to each resume
+    const resumesWithAnalysis = resumes.map(resume => {
+      const latest = latestAnalyses.find(a => a.resume_id === resume.id);
+      return {
+        ...resume,
+        latest_analysis: latest || null
+      };
+    });
 
     const total = await db('resumes')
       .where('user_id', req.user.id)
@@ -216,7 +230,7 @@ router.get('/', authenticateToken, async (req, res, next) => {
       .first();
 
     res.json({
-      resumes,
+      resumes: resumesWithAnalysis,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
@@ -247,12 +261,49 @@ router.get('/:id', authenticateToken, async (req, res, next) => {
     }
 
     // Don't return the full extracted text in list view
-    const { extracted_text, file_path, ...resumeData } = resume;
+    const { extracted_text, ...resumeData } = resume;
+
+    // Fetch the latest analysis for this specific resume
+    const latestAnalysis = await db('resume_analysis')
+      .where('resume_id', id)
+      .orderBy('created_at', 'desc')
+      .first();
 
     res.json({
       resume: resumeData,
+      latest_analysis: latestAnalysis || null,
       has_text: !!extracted_text,
       text_length: extracted_text ? extracted_text.length : 0
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Get all analyses for a specific resume
+router.get('/:id/analyses', authenticateToken, async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    // Check if resume exists and belongs to user
+    const resume = await db('resumes')
+      .where('id', id)
+      .where('user_id', req.user.id)
+      .first();
+
+    if (!resume) {
+      return res.status(404).json({
+        error: 'Resume not found',
+        code: 'RESUME_NOT_FOUND'
+      });
+    }
+
+    const analyses = await db('resume_analysis')
+      .where('resume_id', id)
+      .orderBy('created_at', 'desc');
+
+    res.json({
+      analyses
     });
   } catch (error) {
     next(error);

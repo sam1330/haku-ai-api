@@ -35,7 +35,7 @@ router.get('/overview', authenticateToken, async (req, res, next) => {
       // Recent resumes (last 5)
       db('resumes')
         .where('user_id', userId)
-        .select('id', 'original_filename', 'file_type', 'created_at', 'analysis_results')
+        .select('id', 'original_filename', 'file_type', 'created_at')
         .orderBy('created_at', 'desc')
         .limit(5),
       
@@ -54,18 +54,16 @@ router.get('/overview', authenticateToken, async (req, res, next) => {
         .count('* as count')
         .groupBy('request_type'),
 
-      // Get last 10 analyzed resumes for metrics aggregation
-      db('resumes')
+      // Get last 10 analyses for metrics aggregation
+      db('resume_analysis')
         .where('user_id', userId)
-        .whereNotNull('analysis_results')
-        .select('analysis_results')
+        .select('analysis_results', 'target_role', 'target_company', 'created_at')
         .orderBy('created_at', 'desc')
         .limit(10),
 
-      // Total analyzed resumes count
-      db('resumes')
+      // Total analyses count
+      db('resume_analysis')
         .where('user_id', userId)
-        .whereNotNull('analysis_results')
         .count('* as count')
         .first(),
 
@@ -97,6 +95,12 @@ router.get('/overview', authenticateToken, async (req, res, next) => {
         .limit(5)
     ]);
 
+    // Get IDs of resumes that have at least one analysis (for activity feed flagging)
+    const resumesWithAnalysis = await db('resume_analysis')
+      .whereIn('resume_id', recentResumes.map(r => r.id))
+      .distinct('resume_id')
+      .pluck('resume_id');
+
     // Process resume metrics
     let totalScore = 0;
     const scoreDistribution = { poor: 0, average: 0, good: 0 };
@@ -104,10 +108,9 @@ router.get('/overview', authenticateToken, async (req, res, next) => {
     const allWeaknesses = [];
     const recentAnalyses = [];
 
-    analyzedResumesData.forEach(resume => {
-      const results = resume.analysis_results;
-      if (results && results.analysis) {
-        const score = results.analysis.atsScore || 0;
+    analyzedResumesData.forEach(results => {
+      if (results && results.analysis_results) {
+        const score = results.analysis_results.atsScore || 0;
         totalScore += score;
 
         // Score buckets
@@ -116,11 +119,11 @@ router.get('/overview', authenticateToken, async (req, res, next) => {
         else scoreDistribution.good++;
 
         // Collect strengths and weaknesses
-        if (Array.isArray(results.analysis.strongPoints)) {
-          allStrengths.push(...results.analysis.strongPoints);
+        if (Array.isArray(results.analysis_results.strongPoints)) {
+          allStrengths.push(...results.analysis_results.strongPoints);
         }
-        if (Array.isArray(results.analysis.weaknesses)) {
-          allWeaknesses.push(...results.analysis.weaknesses);
+        if (Array.isArray(results.analysis_results.weaknesses)) {
+          allWeaknesses.push(...results.analysis_results.weaknesses);
         }
 
         // Add to recent analyses list
@@ -128,7 +131,7 @@ router.get('/overview', authenticateToken, async (req, res, next) => {
           target_role: results.target_role,
           target_company: results.target_company,
           score: score,
-          timestamp: results.timestamp
+          timestamp: results.created_at
         });
       }
     });
@@ -163,7 +166,7 @@ router.get('/overview', authenticateToken, async (req, res, next) => {
         id: resume.id,
         description: `Uploaded resume: ${resume.original_filename}`,
         timestamp: resume.created_at,
-        has_analysis: !!resume.analysis_results
+        has_analysis: resumesWithAnalysis.includes(resume.id)
       })),
       ...recentJobApplications.map(app => ({
         type: 'job_application',

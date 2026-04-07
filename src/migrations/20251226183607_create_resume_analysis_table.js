@@ -10,7 +10,14 @@ exports.up = function (knex) {
     table.text('job_description').nullable();
     table.jsonb('analysis_results').notNullable();
 
-    table.string('resume_id').references('id').inTable('resumes').onDelete('CASCADE');
+    table.uuid('resume_id').references('id').inTable('resumes').onDelete('CASCADE').notNullable();
+    table.uuid('user_id').references('id').inTable('users').onDelete('CASCADE').notNullable();
+    table.timestamps(true, true);
+
+    // Indexes
+    table.index('resume_id');
+    table.index('user_id');
+    table.index('created_at');
   });
 };
 

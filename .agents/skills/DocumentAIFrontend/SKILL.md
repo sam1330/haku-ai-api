@@ -13,88 +13,190 @@ The API uses JWT (JSON Web Token) for authentication.
 
 - **Header**: `Authorization: Bearer <token>`
 - **Storage**: Store the token in `localStorage` or a secure cookie.
-- **Expiry**: Tokens are valid for 7 days by default.
 
 ## API Endpoints Base URL
 
-By default, the API runs on `http://localhost:3000/api`.
+Default: `http://localhost:3000/api`
+
+---
 
 ### 1. Authentication (`/auth`)
 
-- `POST /auth/register`: Register a new user.
-    - Body: `{ email, password, first_name, last_name }`
-- `POST /auth/login`: Login and receive a token.
-    - Body: `{ email, password }`
-- `GET /auth/profile`: Get current user info (Requires Auth).
-- `PUT /auth/profile`: Update first/last name (Requires Auth).
-- `PUT /auth/change-password`: Update password (Requires Auth).
+#### `POST /auth/register`
+Register a new user.
+- **Body**: `{ email, password, first_name, last_name }`
+- **Response**:
+```json
+{
+  "message": "User registered successfully",
+  "user": { "id": "uuid", "email": "user@example.com", "first_name": "John", "last_name": "Doe", "subscription_type": "free" },
+  "token": "jwt_token_string"
+}
+```
+
+#### `POST /auth/login`
+Login and receive a token.
+- **Body**: `{ email, password }`
+- **Response**:
+```json
+{
+  "message": "Login successful",
+  "user": { "id": "uuid", "email": "...", "subscription_type": "...", "subscription_expires_at": "ISO-Date" },
+  "token": "jwt_token_string"
+}
+```
+
+#### `GET /auth/profile`
+Get current user info (Requires Auth).
+- **Response**:
+```json
+{
+  "user": { "id": "uuid", "email": "...", "first_name": "...", "last_name": "...", "subscription_type": "...", "created_at": "...", "last_login_at": "..." }
+}
+```
+
+---
 
 ### 2. Dashboard (`/dashboard`)
 
-The dashboard provides overview metrics and usage stats.
+#### `GET /dashboard/overview`
+High-level metrics and combined activity feed (Requires Auth).
+- **Response**:
+```json
+{
+  "overview": {
+    "total_resumes": 10,
+    "total_applications": 5,
+    "analyzed_count": 8,
+    "avg_score": 75,
+    "monthly_cost": 0.50,
+    "applications_this_month": 2,
+    "ai_requests_this_month": 12
+  },
+  "resume_analytics": {
+    "score_distribution": { "poor": 1, "average": 5, "good": 2 },
+    "top_strengths": ["Clear formatting", "Technical skills"],
+    "top_weaknesses": ["Missing metrics"],
+    "recent_analyses": [
+      { "target_role": "Dev", "target_company": "Comp", "score": 85, "timestamp": "ISO-Date" }
+    ]
+  },
+  "recent_activity": [
+    { "type": "resume_upload", "id": "uuid", "description": "Uploaded resume: resume.pdf", "timestamp": "...", "has_analysis": true },
+    { "type": "job_application", "id": "uuid", "description": "Applied to dev role at Google", "status": "applied", "timestamp": "..." },
+    { "type": "ai_request", "id": "uuid", "description": "AI resume analysis completed", "timestamp": "..." }
+  ],
+  "subscription_status": "free",
+  "subscription_expires_at": null
+}
+```
 
-- `GET /dashboard/overview`: High-level metrics (Requires Auth).
-    - Returns:
-        - `overview`: Total resumes, applications, analyzed count, avg score, monthly cost.
-        - `resume_analytics`: Score distribution (poor/average/good), top strengths/weaknesses (arrays), and 10 most recent analytic results.
-        - `recent_activity`: Combined list of latest resumes and applications.
-- `GET /dashboard/ai-usage`: Detailed AI usage over time.
-    - Query: `?period=30` (days)
-- `GET /dashboard/subscription`: Check user tier and limits.
+---
 
 ### 3. Resumes (`/resumes`)
 
-Handling resume uploads, analysis, and optimization.
+#### `GET /resumes`
+List all resumes with their *latest* analysis (Requires Auth).
+- **Query**: `?page=1&limit=10`
+- **Response**:
+```json
+{
+  "resumes": [
+    {
+      "id": "uuid",
+      "original_filename": "resume.pdf",
+      "file_type": "pdf",
+      "file_size": 123456,
+      "is_processed": true,
+      "created_at": "...",
+      "latest_analysis": {
+        "id": "uuid",
+        "target_role": "...",
+        "target_company": "...",
+        "analysis_results": { "atsScore": 85, ... },
+        "created_at": "..."
+      }
+    }
+  ],
+  "pagination": { "page": 1, "limit": 10, "total": 1, "pages": 1 }
+}
+```
 
-- `POST /resumes/upload`: Upload a PDF/DOCX file.
-    - Body: `multipart/form-data` with key `resume`.
-- `GET /resumes`: List all resumes (paginated).
-    - Query: `?page=1&limit=10`
-- `GET /resumes/:id`: Get metadata for a specific resume.
-- `POST /resumes/:id/analyze`: Run AI analysis against a job description.
-    - Body: `{ job_description, target_role, target_company }`
-- `POST /resumes/optimize?resume_id=ID`: Generate an optimized version of the resume.
-    - Body: `{ job_description, target_role }`
-- `DELETE /resumes/:id`: Delete a resume.
+#### `GET /resumes/:id`
+Get a specific resume and its latest analysis (Requires Auth).
+- **Response**:
+```json
+{
+  "resume": { "id": "...", "original_filename": "...", "file_type": "...", ... },
+  "latest_analysis": { "id": "...", "target_role": "...", "analysis_results": { ... }, "created_at": "..." },
+  "has_text": true,
+  "text_length": 5000
+}
+```
+
+#### `GET /resumes/:id/analyses`
+Get *all* analyses for a specific resume (historical data) (Requires Auth).
+- **Response**:
+```json
+{
+  "analyses": [
+    { "id": "uuid", "target_role": "...", "target_company": "...", "analysis_results": { ... }, "created_at": "ISO-Date" }
+  ]
+}
+```
+
+#### `POST /resumes/:id/analyze`
+Run a new AI analysis (Requires Auth).
+- **Body**: `{ job_description, target_role, target_company }`
+- **Response**:
+```json
+{
+  "message": "Resume analysis completed",
+  "analysis": { "overview": "...", "strongPoints": [], "weaknesses": [], "atsScore": 80 },
+  "metadata": { "tokens_used": 1200, "cost": 0.0001, "model": "..." }
+}
+```
+
+---
 
 ### 4. Job Applications (`/job-applications`)
 
-Managing job applications and cover letters.
-
-- `POST /job-applications`: Create a new application tracker.
-    - Body: `{ company_name, position_title, job_description, ... }`
-- `GET /job-applications`: List applications.
-    - Query: `?page=1&limit=10&status=draft|applied|interviewing|offered|rejected`
-- `PUT /job-applications/:id`: Update status or details.
-- `POST /job-applications/:id/cover-letter`: Generate a cover letter.
-    - Body: `{ tone: 'professional'|'casual'|'enthusiastic', length: 'short'|'medium'|'long' }`
-- `GET /job-applications/:id/cover-letter`: Retrieve the generated content.
-
-## Key Data Structures
-
-### Resume Analysis Result
+#### `POST /job-applications`
+Create a new application tracker.
+- **Body**: `{ company_name, position_title, job_description, application_url, application_deadline, notes }`
+- **Response**:
 ```json
 {
-  "overview": "3-sentence summary",
-  "strongPoints": ["Point 1", "Point 2"],
-  "weaknesses": ["Point 1", "Point 2"],
-  "atsScore": 85
+  "message": "Job application created successfully",
+  "job_application": { "id": "uuid", "company_name": "...", "status": "draft", "created_at": "..." }
 }
 ```
 
-### Dashboard Analytics Object
+#### `POST /job-applications/:id/cover-letter`
+Generate a cover letter.
+- **Body**: `{ tone: "professional|casual|enthusiastic", length: "short|medium|long" }`
+- **Response**:
 ```json
 {
-  "score_distribution": { "poor": 1, "average": 5, "good": 2 },
-  "top_strengths": ["Keyword Optimization", "Clear Formatting"],
-  "top_weaknesses": ["Quantifiable metrics missing"],
-  "recent_analyses": [...]
+  "message": "Cover letter generated successfully",
+  "cover_letter": "Dear Hiring Manager...",
+  "metadata": { "tokens_used": 1500, "cost": 0.0002 }
 }
 ```
 
-## Recommended Tech Stack for Frontend
-- **React/Next.js**: For modern component-based UI.
-- **TailwindCSS**: For rapid styling using the "Rich Aesthetics" guidelines.
-- **Axios/TanStack Query**: For efficient data fetching and caching.
-- **Lucide React**: For icons.
-- **Framer Motion**: For smooth micro-animations on the dashboard.
+#### `GET /job-applications/:id/cover-letter`
+Retrieve existing cover letter.
+- **Response**:
+```json
+{
+  "cover_letter": "Dear Hiring Manager...",
+  "metadata": { "tone": "professional", "length": "medium", "generated_at": "..." }
+}
+```
+
+---
+
+## Technical Recommendations
+- **Transitioning to 1-N**: When displaying resumes, always show the `latest_analysis` by default. Provide a history view using the `GET /resumes/:id/analyses` endpoint.
+- **Micro-animations**: Use `framer-motion` for dashboard entry animations.
+- **Aesthetics**: Use `lucide-react` for icons and a dark-mode first design for a premium feel.

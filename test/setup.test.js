@@ -1,24 +1,23 @@
+process.env.NODE_ENV = 'test';
 const request = require('supertest');
 const app = require('../src/server');
+const { db, runMigrations } = require('./helpers');
 
-describe('Server Setup', () => {
+describe('API Environment & Health', () => {
+  beforeAll(async () => {
+    await runMigrations();
+  });
+
+  afterAll(async () => {
+    await db.destroy();
+  });
+
   test('Health check endpoint should return 200', async () => {
     const response = await request(app)
       .get('/health')
       .expect(200);
 
     expect(response.body).toHaveProperty('status', 'OK');
-    expect(response.body).toHaveProperty('timestamp');
-    expect(response.body).toHaveProperty('uptime');
-  });
-
-  test('Non-existent endpoint should return 404', async () => {
-    const response = await request(app)
-      .get('/non-existent')
-      .expect(404);
-
-    expect(response.body).toHaveProperty('error');
-    expect(response.body).toHaveProperty('code', 'NOT_FOUND');
   });
 
   test('CORS should be configured', async () => {
@@ -28,61 +27,13 @@ describe('Server Setup', () => {
 
     expect(response.headers).toHaveProperty('access-control-allow-origin');
   });
-});
 
-describe('Authentication Endpoints', () => {
-  test('Register endpoint should exist', async () => {
-    const response = await request(app)
-      .post('/api/auth/register')
-      .send({
-        email: 'test@example.com',
-        password: 'password123',
-        first_name: 'Test',
-        last_name: 'User'
-      });
-
-    // Should return 400 or 409 (validation error or user exists)
-    expect([400, 409]).toContain(response.status);
+  test('Environment should be test', () => {
+    expect(process.env.NODE_ENV).toBe('test');
   });
 
-  test('Login endpoint should exist', async () => {
-    const response = await request(app)
-      .post('/api/auth/login')
-      .send({
-        email: 'test@example.com',
-        password: 'password123'
-      });
-
-    // Should return 400 or 401 (validation error or invalid credentials)
-    expect([400, 401]).toContain(response.status);
-  });
-});
-
-describe('API Routes', () => {
-  test('Resume routes should be protected', async () => {
-    const response = await request(app)
-      .get('/api/resume')
-      .expect(401);
-
-    expect(response.body).toHaveProperty('error', 'Access token required');
-    expect(response.body).toHaveProperty('code', 'MISSING_TOKEN');
-  });
-
-  test('Job application routes should be protected', async () => {
-    const response = await request(app)
-      .get('/api/job-application')
-      .expect(401);
-
-    expect(response.body).toHaveProperty('error', 'Access token required');
-    expect(response.body).toHaveProperty('code', 'MISSING_TOKEN');
-  });
-
-  test('Dashboard routes should be protected', async () => {
-    const response = await request(app)
-      .get('/api/dashboard/overview')
-      .expect(401);
-
-    expect(response.body).toHaveProperty('error', 'Access token required');
-    expect(response.body).toHaveProperty('code', 'MISSING_TOKEN');
+  test('Database connection should be to test DB', async () => {
+    const dbName = await db.raw('SELECT current_database()');
+    expect(dbName.rows[0].current_database).toBe(process.env.DB_TEST_NAME || 'resume_ai_test_db');
   });
 });

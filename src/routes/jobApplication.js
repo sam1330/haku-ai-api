@@ -3,6 +3,7 @@ const db = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
 const { validate, jobApplicationSchema, updateJobApplicationSchema, coverLetterSchema } = require('../middleware/validation');
 const aiService = require('../services/aiService');
+const { checkCredits } = require('../middleware/creditMiddleware');
 
 const router = express.Router();
 
@@ -33,7 +34,7 @@ router.post('/', authenticateToken, validate(jobApplicationSchema), async (req, 
 });
 
 // Generate cover letter for job application
-router.post('/:id/cover-letter', authenticateToken, validate(coverLetterSchema), async (req, res, next) => {
+router.post('/:id/cover-letter', authenticateToken, checkCredits('COVER_LETTER_GENERATION'), validate(coverLetterSchema), async (req, res, next) => {
   try {
     const { id } = req.params;
     const { tone, length } = req.body;
@@ -71,6 +72,7 @@ router.post('/:id/cover-letter', authenticateToken, validate(coverLetterSchema),
       jobApplication.job_description,
       jobApplication.company_name,
       jobApplication.position_title,
+      req.user.id,
       tone,
       length
     );

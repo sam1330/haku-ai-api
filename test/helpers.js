@@ -8,11 +8,11 @@ const cleanDatabase = async () => {
   // We want to delete in order to avoid foreign key constraints
   // Starting with child tables
   const tables = [
-    'job_application_logs',
-    'job_applications',
+    'credit_transactions',
+    'ai_requests',
     'resume_analysis',
+    'job_applications',
     'resumes',
-    'user_settings',
     'users'
   ];
 

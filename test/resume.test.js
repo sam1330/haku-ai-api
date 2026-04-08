@@ -2,6 +2,23 @@ process.env.NODE_ENV = 'test';
 const request = require('supertest');
 const app = require('../src/server');
 const { cleanDatabase, createTestUser, generateToken, db, runMigrations } = require('./helpers');
+const path = require('path');
+const fs = require('fs');
+const fileService = require('../src/services/fileService');
+
+// jest.mock('../src/services/fileService', () => {
+//   const actual = jest.requireActual('../src/services/fileService');
+
+//   // We keep the real Multer config, but mock the extract method
+//   return {
+//     ...actual,
+//     extractTextFromFile: jest.fn().mockResolvedValue(function () {
+//       return 'Mocked text content';
+//     })
+//   };
+// });
+
+const filePath = path.join(__dirname, 'test-resume.pdf');
 
 describe('Resume Integration Tests', () => {
   let user;
@@ -85,14 +102,46 @@ describe('Resume Integration Tests', () => {
     });
   });
 
+  describe('POST /api/resume/upload', () => {
+    beforeAll(() => {
+      fs.writeFileSync(filePath, 'test-resume.pdf');
+    });
+
+    afterAll(() => {
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    });
+
+    test('should upload a resume', async () => {
+      // fileService.extractTextFromFile.mockResolvedValue('Sample resume text');
+      // fileService.getFileTypeFromMimeType.mockReturnValue('pdf');
+
+      let textSpy = jest.spyOn(fileService, 'extractTextFromFile')
+        .mockResolvedValue('This is mocked extracted text content');
+
+      const response = await request(app)
+        .post('/api/resume/upload')
+        .set('Authorization', `Bearer ${token}`)
+        .attach('resume', filePath)
+        .expect(201);
+
+      expect(response.body.message).toBe('Resume uploaded and processed successfully');
+      expect(response.body.resume).toHaveProperty('id');
+      expect(response.body.resume).toHaveProperty('original_filename', 'test-resume.pdf');
+
+      textSpy.mockRestore();
+    }, 10000);
+  });
+
   describe('DELETE /api/resume/:id', () => {
     let resumeId;
 
     beforeEach(async () => {
       const [resume] = await db('resumes').insert({
         user_id: user.id,
-        original_filename: 'delete-me.pdf',
-        file_path: 'uploads/delete-me.pdf',
+        original_filename: 'test-resume.pdf',
+        file_path: 'uploads/test-resume.pdf',
         file_type: 'pdf',
         file_size: 512,
         extracted_text: 'Delete me',
@@ -101,11 +150,32 @@ describe('Resume Integration Tests', () => {
       resumeId = resume.id;
     });
 
+    beforeAll(() => {
+      fs.writeFileSync(filePath, 'test-resume.pdf');
+    });
+
+    afterAll(() => {
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    });
+
     test('should delete a resume record', async () => {
-      // Note: This will attempt to delete from filesystem. 
-      // Since the file doesn't exist, we might need to handle it in the service or mock it.
-      // Currently the service logs error but doesn't throw if file is missing.
-      
+      // fileService.extractTextFromFile.mockResolvedValue('Sample resume text');
+      // fileService.getFileTypeFromMimeType.mockReturnValue('pdf');
+      // fileService.deleteFile.mockResolvedValue(true);
+      let textSpy = jest.spyOn(fileService, 'extractTextFromFile')
+        .mockResolvedValue('This is mocked extracted text content');
+      let deleteSpy = jest.spyOn(fileService, 'deleteFile')
+        .mockResolvedValue(true);
+
+      await request(app)
+        .post('/api/resume/upload')
+        .set('Authorization', `Bearer ${token}`)
+        .attach('resume', filePath)
+        .expect(201);
+
+
       const response = await request(app)
         .delete(`/api/resume/${resumeId}`)
         .set('Authorization', `Bearer ${token}`)
@@ -115,6 +185,9 @@ describe('Resume Integration Tests', () => {
 
       const check = await db('resumes').where('id', resumeId).first();
       expect(check).toBeUndefined();
+
+      textSpy.mockRestore();
+      deleteSpy.mockRestore();
     });
   });
 });

@@ -10,6 +10,7 @@ const authRoutes = require('./routes/auth');
 const resumeRoutes = require('./routes/resume');
 const jobApplicationRoutes = require('./routes/jobApplication');
 const dashboardRoutes = require('./routes/dashboard');
+const creditRoutes = require('./routes/credits');
 const { errorHandler } = require('./middleware/errorHandler');
 const { notFound } = require('./middleware/notFound');
 const { checkDatabaseConnection } = require('./middleware/dbHealth');
@@ -56,6 +57,7 @@ app.use('/api/auth', checkDatabaseConnection, authRoutes);
 app.use('/api/resume', checkDatabaseConnection, resumeRoutes);
 app.use('/api/job-application', checkDatabaseConnection, jobApplicationRoutes);
 app.use('/api/dashboard', checkDatabaseConnection, dashboardRoutes);
+app.use('/api/credits', checkDatabaseConnection, creditRoutes);
 
 // Error handling middleware
 app.use(notFound);

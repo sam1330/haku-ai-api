@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "test": "jest",
+    "test": "jest --runInBand --forceExit",
     "test:db": "node scripts/test-db.js",
     "migrate": "knex migrate:latest",
     "seed": "knex seed:run"
@@ -45,5 +45,11 @@
   },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "setupFiles": ["<rootDir>/test/jestSetup.js"],
+    "testTimeout": 30000,
+    "clearMocks": true
   }
 }

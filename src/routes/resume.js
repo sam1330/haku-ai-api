@@ -4,6 +4,8 @@ const { authenticateToken, requireSubscription } = require('../middleware/auth')
 const { validate, resumeAnalysisSchema } = require('../middleware/validation');
 const fileService = require('../services/fileService');
 const aiService = require('../services/aiService');
+const { checkCredits } = require('../middleware/creditMiddleware');
+const { CREDIT_COSTS } = require('../config/constants');
 
 const router = express.Router();
 
@@ -55,7 +57,7 @@ router.post('/upload', authenticateToken, fileService.getMulterConfig().single('
 });
 
 // Analyze resume
-router.post('/:resume_id/analyze', authenticateToken, validate(resumeAnalysisSchema), async (req, res, next) => {
+router.post('/:resume_id/analyze', authenticateToken, checkCredits('RESUME_ANALYSIS'), validate(resumeAnalysisSchema), async (req, res, next) => {
   try {
     const { job_description, target_role, target_company } = req.body;
     const { resume_id } = req.params;
@@ -92,7 +94,8 @@ router.post('/:resume_id/analyze', authenticateToken, validate(resumeAnalysisSch
       resume.extracted_text,
       job_description,
       target_role,
-      target_company
+      target_company,
+      req.user.id
     );
 
     // Save analysis results to the new table
@@ -133,7 +136,7 @@ router.post('/:resume_id/analyze', authenticateToken, validate(resumeAnalysisSch
 });
 
 // Optimize resume
-router.post('/optimize', authenticateToken, requireSubscription('pro'), validate(resumeAnalysisSchema), async (req, res, next) => {
+router.post('/optimize', authenticateToken, checkCredits('RESUME_OPTIMIZATION'), validate(resumeAnalysisSchema), async (req, res, next) => {
   try {
     const { job_description, target_role } = req.body;
     const { resume_id } = req.query;
@@ -169,7 +172,8 @@ router.post('/optimize', authenticateToken, requireSubscription('pro'), validate
     const optimizationResult = await aiService.optimizeResume(
       resume.extracted_text,
       job_description,
-      target_role
+      target_role,
+      req.user.id
     );
 
     // Log AI request

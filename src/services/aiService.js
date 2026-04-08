@@ -1,6 +1,8 @@
 const { VertexAI } = require('@google-cloud/vertexai');
 const db = require('../config/database');
 const dotenv = require('dotenv');
+const creditService = require('./creditService');
+const { CREDIT_COSTS } = require('../config/constants');
 dotenv.config();
 
 class AIService {
@@ -21,8 +23,17 @@ class AIService {
     this.model = this.vertexAI.preview.getGenerativeModel({ model: this.modelName });
   }
 
-  async analyzeResume(resumeText, jobDescription, targetRole = null, targetCompany = null) {
+  async analyzeResume(resumeText, jobDescription, targetRole = null, targetCompany = null, userId = null) {
+    let creditTx = null;
     try {
+      if (userId) {
+        creditTx = await creditService.deductCredits(
+          userId, 
+          CREDIT_COSTS.RESUME_ANALYSIS, 
+          'Resume Analysis'
+        );
+      }
+
       const prompt = this.buildResumeAnalysisPrompt(resumeText, jobDescription, targetRole, targetCompany);
 
       const request = {
@@ -69,13 +80,24 @@ class AIService {
         model: this.modelName
       };
     } catch (error) {
+      if (userId && creditTx) {
+        await creditService.refundCredits(userId, creditTx.id, error.message);
+      }
       console.error('AI Resume Analysis Error:', error);
       throw new Error('Failed to analyze resume: ' + error.message);
     }
   }
 
-  async generateCoverLetter(resumeText, jobDescription, companyName, positionTitle, tone = 'professional', length = 'medium') {
+  async generateCoverLetter(resumeText, jobDescription, companyName, positionTitle, userId = null, tone = 'professional', length = 'medium') {
+    let creditTx = null;
     try {
+      if (userId) {
+        creditTx = await creditService.deductCredits(
+          userId, 
+          CREDIT_COSTS.COVER_LETTER_GENERATION, 
+          'Cover Letter Generation'
+        );
+      }
       const prompt = this.buildCoverLetterPrompt(resumeText, jobDescription, companyName, positionTitle, tone, length);
 
       const request = {
@@ -105,13 +127,24 @@ class AIService {
         model: this.modelName
       };
     } catch (error) {
+      if (userId && creditTx) {
+        await creditService.refundCredits(userId, creditTx.id, error.message);
+      }
       console.error('AI Cover Letter Generation Error:', error);
       throw new Error('Failed to generate cover letter: ' + error.message);
     }
   }
 
-  async optimizeResume(resumeText, jobDescription, targetRole = null) {
+  async optimizeResume(resumeText, jobDescription, targetRole = null, userId = null) {
+    let creditTx = null;
     try {
+      if (userId) {
+        creditTx = await creditService.deductCredits(
+          userId, 
+          CREDIT_COSTS.RESUME_OPTIMIZATION, 
+          'Resume Optimization'
+        );
+      }
       const prompt = this.buildResumeOptimizationPrompt(resumeText, jobDescription, targetRole);
 
       const request = {
@@ -141,6 +174,9 @@ class AIService {
         model: this.modelName
       };
     } catch (error) {
+      if (userId && creditTx) {
+        await creditService.refundCredits(userId, creditTx.id, error.message);
+      }
       console.error('AI Resume Optimization Error:', error);
       throw new Error('Failed to optimize resume: ' + error.message);
     }

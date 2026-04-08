@@ -9,10 +9,11 @@ const router = express.Router();
 // Create job application
 router.post('/', authenticateToken, validate(jobApplicationSchema), async (req, res, next) => {
   try {
-    const { company_name, position_title, job_description, application_url, application_deadline, notes } = req.body;
+    const { company_name, position_title, job_description, application_url, application_deadline, notes, resume_id } = req.body;
 
     const [jobApplication] = await db('job_applications').insert({
       user_id: req.user.id,
+      resume_id,
       company_name,
       position_title,
       job_description,
@@ -92,8 +93,8 @@ router.post('/:id/cover-letter', authenticateToken, validate(coverLetterSchema),
     await aiService.logAIRequest(
       req.user.id,
       'cover_letter_generation',
-      { 
-        job_application_id: id, 
+      {
+        job_application_id: id,
         company_name: jobApplication.company_name,
         position_title: jobApplication.position_title,
         tone,

@@ -44,9 +44,10 @@ const jobApplicationSchema = Joi.object({
   company_name: Joi.string().min(2).max(100).required(),
   position_title: Joi.string().min(2).max(100).required(),
   job_description: Joi.string().min(50).max(10000).required(),
-  application_url: Joi.string().uri().optional(),
-  application_deadline: Joi.date().optional(),
-  notes: Joi.string().max(1000).optional()
+  application_url: Joi.string().uri().optional().allow(''),
+  application_deadline: Joi.date().optional().allow(''),
+  notes: Joi.string().max(1000).optional().allow(''),
+  resume_id: Joi.string().uuid().required(),
 });
 
 const updateJobApplicationSchema = Joi.object({

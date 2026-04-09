@@ -138,10 +138,10 @@ class CreditService {
 
   /**
    * Add credits to user's account (top-up, bonus, etc.)
-   * @param {string} userId 
-   * @param {number} amount 
-   * @param {string} type 
-   * @param {string} description 
+   * @param {string} userId
+   * @param {number} amount
+   * @param {string} type
+   * @param {string} description
    * @param {object} options { expiresAt, metadata }
    * @returns {Promise<object>} The transaction record
    */

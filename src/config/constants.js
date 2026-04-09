@@ -11,5 +11,5 @@ module.exports = {
     REFUND: 'refund',
     BONUS: 'bonus'
   },
-  DEFAULT_WELCOME_CREDITS: 50
+  DEFAULT_WELCOME_CREDITS: 30
 };

@@ -19,7 +19,7 @@ class AIService {
 
     this.vertexAI = new VertexAI({ project: this.project, location: this.location });
     // Using gemini-1.5-flash as a cost-effective alternative to GPT-4
-    this.modelName = 'gemini-2.5-flash-lite';
+    this.modelName = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
     this.model = this.vertexAI.preview.getGenerativeModel({ model: this.modelName });
   }
 
@@ -43,7 +43,7 @@ class AIService {
           parts: [{ text: "You are an expert resume analyst and career coach. Analyze resumes for ATS compatibility, keyword optimization, and overall effectiveness. Provide specific, actionable feedback. Be extremely concise. Use bullet points within strings. Limit the overview to 3 sentences. Do not over-extend the response, try to keep it under 500 words." }]
         },
         generationConfig: {
-          maxOutputTokens: 2000,
+          maxOutputTokens: 5000,
           temperature: 0.3,
           responseMimeType: 'application/json',
           responseSchema: {
@@ -67,6 +67,7 @@ class AIService {
 
       const result = await this.model.generateContent(request);
       const response = await result.response;
+      console.log('Response:', response);
       const analysis = JSON.parse(response.candidates[0].content.parts[0].text);
 
       const usageMetadata = response.usageMetadata;
@@ -265,9 +266,9 @@ class AIService {
     // This is significantly cheaper than GPT-4
 
     const pricing = {
-      'gemini-1.5-flash-001': {
-        input: 0.075 / 1000000,
-        output: 0.30 / 1000000
+      'gemini-2.5-flash': {
+        input: 0.30 / 1000000,
+        output: 2.50 / 1000000
       }
     };
 
@@ -290,7 +291,7 @@ class AIService {
     // I should probably update `calculateCost` to take `promptTokens` and `completionTokens`.
 
     // However, to keep it simple and consistent with the signature:
-    const modelPricing = pricing[model] || pricing['gemini-1.5-flash-001'];
+    const modelPricing = pricing[model] || pricing['gemini-2.5-flash'];
     // Conservative average
     return tokens * ((modelPricing.input + modelPricing.output) / 2);
   }
@@ -298,12 +299,12 @@ class AIService {
   // Helper to be more precise if needed, but keeping the class structure similar for now.
   calculatePreciseCost(promptTokens, completionTokens, model) {
     const pricing = {
-      'gemini-1.5-flash-001': {
-        input: 0.075 / 1000000,
-        output: 0.30 / 1000000
+      'gemini-2.5-flash': {
+        input: 0.30 / 1000000,
+        output: 2.50 / 1000000
       }
     };
-    const modelPricing = pricing[model] || pricing['gemini-1.5-flash-001'];
+    const modelPricing = pricing[model] || pricing['gemini-2.5-flash'];
     return (promptTokens * modelPricing.input) + (completionTokens * modelPricing.output);
   }
 

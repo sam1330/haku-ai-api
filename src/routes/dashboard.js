@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
+const enums = require('../enums');
 
 const router = express.Router();
 
@@ -114,8 +115,8 @@ router.get('/overview', authenticateToken, async (req, res, next) => {
         totalScore += score;
 
         // Score buckets
-        if (score < 60) scoreDistribution.poor++;
-        else if (score < 80) scoreDistribution.average++;
+        if (score < 6) scoreDistribution.poor++;
+        else if (score < 8) scoreDistribution.average++;
         else scoreDistribution.good++;
 
         // Collect strengths and weaknesses
@@ -162,21 +163,24 @@ router.get('/overview', authenticateToken, async (req, res, next) => {
     // Create a flattened activity feed
     const activities = [
       ...recentResumes.map(resume => ({
-        type: 'resume_upload',
+        title: "Resume upload",
+        type: enums.ACTIVITY_TYPES.RESUME_UPLOAD,
         id: resume.id,
         description: `Uploaded resume: ${resume.original_filename}`,
         timestamp: resume.created_at,
         has_analysis: resumesWithAnalysis.includes(resume.id)
       })),
       ...recentJobApplications.map(app => ({
-        type: 'job_application',
+        title: "Job application",
+        type: enums.ACTIVITY_TYPES.JOB_APPLICATION,
         id: app.id,
         description: `Applied to ${app.position_title} at ${app.company_name}`,
         status: app.status,
         timestamp: app.created_at
       })),
       ...recentAIRequests.map(req => ({
-        type: 'ai_request',
+        title: "AI request",
+        type: enums.ACTIVITY_TYPES.AI_REQUEST,
         id: req.id,
         description: `AI ${req.request_type.replace('_', ' ')} ${req.status}`,
         timestamp: req.created_at

@@ -5,9 +5,11 @@ exports.up = function(knex) {
     table.string('password_hash').notNullable();
     table.string('first_name').notNullable();
     table.string('last_name').notNullable();
-    table.enum('subscription_type', ['free', 'pro']).defaultTo('free');
+    table.enum('subscription_type', ['candidate', 'recruiter']).defaultTo('free');
+    table.enum('subscription_tier', ['free', 'pro']).defaultTo('free');
     table.timestamp('subscription_expires_at').nullable();
     table.boolean('is_active').defaultTo(true);
+    table.integer('credits').notNullable().defaultTo(30);
     table.timestamp('email_verified_at').nullable();
     table.timestamp('last_login_at').nullable();
     table.timestamps(true, true);
@@ -16,6 +18,7 @@ exports.up = function(knex) {
     table.index('email');
     table.index('subscription_type');
     table.index('is_active');
+    table.index('credits');
   });
 };
 

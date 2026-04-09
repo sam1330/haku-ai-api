@@ -5,7 +5,6 @@ const { validate, resumeAnalysisSchema } = require('../middleware/validation');
 const fileService = require('../services/fileService');
 const aiService = require('../services/aiService');
 const { checkCredits } = require('../middleware/creditMiddleware');
-const { CREDIT_COSTS } = require('../config/constants');
 
 const router = express.Router();
 

@@ -19,7 +19,7 @@ The Haku API uses a credit-based system where users consume credits for AI-power
 
 #### Users Table Extension
 ```js
-table.integer('credits').defaultTo(50); // Initial welcome credits
+table.integer('credits').defaultTo(30); // Initial welcome credits
 ```
 
 #### Credit Transactions Table

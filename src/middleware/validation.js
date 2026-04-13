@@ -24,6 +24,10 @@ const loginSchema = Joi.object({
   password: Joi.string().required(),
 });
 
+const forgotPasswordSchema = Joi.object({
+  email: Joi.string().email().required(),
+});
+
 // Resume validation schemas
 const resumeAnalysisSchema = Joi.object({
   job_description: Joi.string().min(50).max(10000).required(),
@@ -88,4 +92,5 @@ module.exports = {
   coverLetterSchema,
   jobApplicationSchema,
   updateJobApplicationSchema,
+  forgotPasswordSchema
 };

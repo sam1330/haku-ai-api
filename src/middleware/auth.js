@@ -57,9 +57,9 @@ const authenticateToken = async (req, res, next) => {
 const requireSubscription = (subscriptionType = 'pro') => {
   return (req, res, next) => {
     const user = req.user;
-    
+
     if (!user) {
-      return res.status(401).json({ 
+      return res.status(401).json({
         error: 'Authentication required',
         code: 'AUTH_REQUIRED'
       });
@@ -67,11 +67,11 @@ const requireSubscription = (subscriptionType = 'pro') => {
 
     // Check if user has active subscription
     if (user.subscription_type !== subscriptionType) {
-      const isSubscriptionExpired = user.subscription_expires_at && 
+      const isSubscriptionExpired = user.subscription_expires_at &&
         new Date(user.subscription_expires_at) < new Date();
-      
+
       if (isSubscriptionExpired || user.subscription_type === 'free') {
-        return res.status(403).json({ 
+        return res.status(403).json({
           error: `${subscriptionType} subscription required`,
           code: 'SUBSCRIPTION_REQUIRED',
           required_subscription: subscriptionType,
@@ -84,7 +84,32 @@ const requireSubscription = (subscriptionType = 'pro') => {
   };
 };
 
+// Middleware to require email verification
+const requireVerified = async (req, res, next) => {
+  const user = req.user;
+
+  if (!user) {
+    return res.status(401).json({
+      error: 'Authentication required',
+      code: 'AUTH_REQUIRED'
+    });
+  }
+
+  // Check if user has verified their email
+  const dbUser = await db('users').select('email_verified_at').where('id', user.id).first();
+
+  if (!dbUser || !dbUser.email_verified_at) {
+    return res.status(403).json({
+      error: 'Please verify your email to access this resource',
+      code: 'EMAIL_NOT_VERIFIED'
+    });
+  }
+
+  next();
+};
+
 module.exports = {
   authenticateToken,
-  requireSubscription
+  requireSubscription,
+  requireVerified
 };

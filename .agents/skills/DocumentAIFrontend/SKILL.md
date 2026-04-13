@@ -28,14 +28,70 @@ Register a new user.
 - **Response**:
 ```json
 {
-  "message": "User registered successfully",
-  "user": { "id": "uuid", "email": "user@example.com", "first_name": "John", "last_name": "Doe", "subscription_type": "free" },
-  "token": "jwt_token_string"
+  "message": "User registered successfully. Please check your email to verify your account.",
+  "user": { "id": "uuid", "email": "user@example.com", "first_name": "John", "last_name": "Doe", "subscription_type": "free", "email_verified": false },
+  "token": null
+}
+```
+- **Conflict Response (409)**:
+```json
+{
+  "error": "User already exists with this email",
+  "code": "USER_EXISTS"
 }
 ```
 
+#### `POST /auth/verify-email`
+Verify user's email using the token sent to their inbox.
+- **Body**: `{ token }`
+- **Response**:
+```json
+{
+  "message": "Email verified successfully",
+  "user": { "id": "uuid", "email": "user@example.com", "first_name": "John", "last_name": "Doe", "subscription_type": "free", "email_verified": true },
+  "token": "jwt-token-here"
+}
+```
+- **Error Responses**:
+  - `400` - `MISSING_TOKEN`: token field not provided
+  - `400` - `INVALID_TOKEN`: no user found with this token
+  - `400` - `TOKEN_EXPIRED`: token expired (24-hour expiry)
+  - `400` - `ALREADY_VERIFIED`: email already verified
+
+#### `POST /auth/resend-verification`
+Request a new verification email.
+- **Body**: `{ email }`
+- **Response**:
+```json
+{
+  "message": "Verification email sent successfully",
+  "email": "user@example.com"
+}
+```
+- **Error Responses**:
+  - `400` - `MISSING_EMAIL`: email not provided
+  - `404` - `USER_NOT_FOUND`: no user with this email
+  - `400` - `ALREADY_VERIFIED`: email already verified
+  - `500` - `EMAIL_SEND_FAILED`: SMTP failure
+
+#### `GET /auth/verify-email/status`
+Check if a user's email has been verified.
+- **Query**: `?email=user@example.com`
+- **Response**:
+```json
+{
+  "email": "user@example.com",
+  "email_verified": true,
+  "first_name": "John",
+  "last_name": "Doe"
+}
+```
+- **Error Responses**:
+  - `400` - `MISSING_EMAIL`: email query parameter not provided
+  - `404` - `USER_NOT_FOUND`: no user with this email
+
 #### `POST /auth/login`
-Login and receive a token.
+Login and receive a token. **Note: Requires email to be verified.**
 - **Body**: `{ email, password }`
 - **Response**:
 ```json
@@ -43,6 +99,14 @@ Login and receive a token.
   "message": "Login successful",
   "user": { "id": "uuid", "email": "...", "subscription_type": "...", "subscription_expires_at": "ISO-Date" },
   "token": "jwt_token_string"
+}
+```
+- **Error Response (403)** - Unverified email:
+```json
+{
+  "error": "Please verify your email before logging in",
+  "code": "EMAIL_NOT_VERIFIED",
+  "email": "user@example.com"
 }
 ```
 
@@ -197,6 +261,23 @@ Retrieve existing cover letter.
 ---
 
 ## Technical Recommendations
+- **Email Verification Flow**: After registration, redirect users to a "Check your email" page. The token expires in 24 hours. Use the `GET /auth/verify-email/status` endpoint to poll verification status or wait for the user to click the verification link.
+- **Handling Unverified Users**: The `/auth/login` endpoint will return a 403 error with code `EMAIL_NOT_VERIFIED` if the user hasn't verified their email. Show a helpful message directing them to check their inbox or resend the verification email.
 - **Transitioning to 1-N**: When displaying resumes, always show the `latest_analysis` by default. Provide a history view using the `GET /resumes/:id/analyses` endpoint.
 - **Micro-animations**: Use `framer-motion` for dashboard entry animations.
 - **Aesthetics**: Use `lucide-react` for icons and a dark-mode first design for a premium feel.
+
+## Middleware
+
+### `requireVerified`
+This middleware ensures that an authenticated user has verified their email. Apply it to any route that should only be accessible to verified users.
+
+- **Response (403)** if email not verified:
+```json
+{
+  "error": "Please verify your email to access this feature",
+  "code": "EMAIL_NOT_VERIFIED"
+}
+```
+
+**Frontend Implementation**: When receiving this error, show a modal or banner prompting the user to verify their email, with a button to resend the verification email.

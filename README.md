@@ -53,21 +53,31 @@ A comprehensive Node.js backend for an AI-powered resume analysis and job applic
    # Server Configuration
    PORT=3000
    NODE_ENV=development
-   
+
    # Database Configuration
    DB_HOST=localhost
    DB_PORT=5432
    DB_NAME=resume_ai_db
    DB_USER=your_db_user
    DB_PASSWORD=your_db_password
-   
+
    # JWT Configuration
    JWT_SECRET=your_super_secret_jwt_key_here
    JWT_EXPIRES_IN=7d
-   
+
    # OpenAI Configuration
    OPENAI_API_KEY=your_openai_api_key_here
-   
+
+   # Email Configuration (SMTP)
+   SMTP_HOST=smtp.gmail.com
+   SMTP_PORT=587
+   SMTP_USER=your_email@gmail.com
+   SMTP_PASS=your_app_password
+   SMTP_FROM_NAME=Haku AI Resume Assistant
+
+   # Frontend URL (for verification links)
+   FRONTEND_URL=http://localhost:3001
+
    # File Upload Configuration
    MAX_FILE_SIZE=10485760
    UPLOAD_PATH=./uploads
@@ -90,8 +100,11 @@ A comprehensive Node.js backend for an AI-powered resume analysis and job applic
 ## API Endpoints
 
 ### Authentication
-- `POST /api/auth/register` - User registration
-- `POST /api/auth/login` - User login
+- `POST /api/auth/register` - User registration (sends verification email)
+- `POST /api/auth/login` - User login (requires email verification)
+- `POST /api/auth/verify-email` - Verify email with token
+- `POST /api/auth/resend-verification` - Resend verification email
+- `GET /api/auth/verify-email/status` - Check verification status
 - `GET /api/auth/profile` - Get user profile
 - `PUT /api/auth/profile` - Update user profile
 - `PUT /api/auth/change-password` - Change password
@@ -196,6 +209,7 @@ A comprehensive Node.js backend for an AI-powered resume analysis and job applic
 
 - JWT-based authentication
 - Password hashing with bcrypt
+- **Email verification** - Users must verify their email before accessing the platform
 - Rate limiting
 - CORS protection
 - Helmet security headers

@@ -2,9 +2,10 @@ const express = require('express');
 const db = require('../config/database');
 const { authenticateToken, requireSubscription } = require('../middleware/auth');
 const { validate, resumeAnalysisSchema } = require('../middleware/validation');
-const fileService = require('../services/fileService');
+const { fileService } = require('../services/fileService');
 const aiService = require('../services/aiService');
 const { checkCredits } = require('../middleware/creditMiddleware');
+const enums = require('../enums');
 
 const router = express.Router();
 
@@ -18,9 +19,12 @@ router.post('/upload', authenticateToken, fileService.getMulterConfig().single('
       });
     }
 
-    const { originalname, filename, path, mimetype, size } = req.file;
+    const { originalname, filename, mimetype, size } = req.file;
     const fileType = fileService.getFileTypeFromMimeType(mimetype);
 
+    // Save file to S3
+    const path = await fileService.storeFile(req.file.buffer, originalname, mimetype);
+    
     // Extract text from file
     const extractedText = await fileService.extractTextFromFile(path, fileType);
 
@@ -32,7 +36,8 @@ router.post('/upload', authenticateToken, fileService.getMulterConfig().single('
       file_type: fileType,
       file_size: size,
       extracted_text: extractedText,
-      is_processed: true
+      is_processed: true,
+      source: enums.RESUME_SOURCE_TYPES.UPLOAD
     }).returning(['id', 'original_filename', 'file_type', 'file_size', 'created_at']);
 
     res.status(201).json({
@@ -207,7 +212,7 @@ router.get('/', authenticateToken, async (req, res, next) => {
 
     const resumes = await db('resumes')
       .where('user_id', req.user.id)
-      .select('id', 'original_filename', 'file_type', 'file_size', 'is_processed', 'created_at', 'updated_at')
+      .select('id', 'original_filename', 'file_type', 'file_size', 'is_processed', 'created_at', 'updated_at', 'source')
       .orderBy('created_at', 'desc')
       .limit(limit)
       .offset(offset);

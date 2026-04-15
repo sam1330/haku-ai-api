@@ -55,8 +55,8 @@ app.get('/health', (req, res) => {
 
 // API routes with database health check
 app.use('/api/auth', checkDatabaseConnection, authRoutes);
-app.use('/api/resume', checkDatabaseConnection, resumeRoutes);
-app.use('/api/job-application', checkDatabaseConnection, jobApplicationRoutes);
+app.use('/api/resumes', checkDatabaseConnection, resumeRoutes);
+app.use('/api/job-applications', checkDatabaseConnection, jobApplicationRoutes);
 app.use('/api/dashboard', checkDatabaseConnection, dashboardRoutes);
 app.use('/api/credits', checkDatabaseConnection, creditRoutes);
 

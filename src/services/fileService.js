@@ -1,47 +1,55 @@
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs').promises;
-const pdfParse = require('pdf-parse');
-const mammoth = require('mammoth');
-const { v4: uuidv4 } = require('uuid');
+import multer from "multer";
+import path from "path";
+import mammoth from "mammoth";
+import { v4 } from "uuid";
+import {
+  S3Client,
+  PutObjectCommand,
+  DeleteObjectCommand,
+  paginateListObjectsV2,
+  GetObjectCommand,
+} from "@aws-sdk/client-s3";
+import { PDFParse } from "pdf-parse";
 
-class FileService {
+export default class FileService {
   constructor() {
-    this.uploadPath = process.env.UPLOAD_PATH || './uploads';
     this.maxFileSize = parseInt(process.env.MAX_FILE_SIZE) || 10 * 1024 * 1024; // 10MB
     this.allowedMimeTypes = [
-      'application/pdf',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'application/msword'
+      "application/pdf",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "application/msword",
     ];
-    
+
     this.initializeUploadDirectory();
   }
 
   async initializeUploadDirectory() {
     try {
-      await fs.mkdir(this.uploadPath, { recursive: true });
+      this.s3 = new S3Client({
+        region: process.env.AWS_REGION,
+        credentials: {
+          accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+          secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+        },
+      });
+      this.bucket = process.env.AWS_BUCKET_NAME;
     } catch (error) {
-      console.error('Failed to create upload directory:', error);
+      console.error("Failed to create upload directory:", error);
     }
   }
 
   getMulterConfig() {
-    const storage = multer.diskStorage({
-      destination: (req, file, cb) => {
-        cb(null, this.uploadPath);
-      },
-      filename: (req, file, cb) => {
-        const uniqueName = `${uuidv4()}-${Date.now()}${path.extname(file.originalname)}`;
-        cb(null, uniqueName);
-      }
-    });
+    // 1. Use memory storage instead of disk storage
+    const storage = multer.memoryStorage();
 
     const fileFilter = (req, file, cb) => {
       if (this.allowedMimeTypes.includes(file.mimetype)) {
         cb(null, true);
       } else {
-        cb(new Error('Invalid file type. Only PDF and DOCX files are allowed.'), false);
+        cb(
+          new Error("Invalid file type. Only PDF and DOCX files are allowed."),
+          false,
+        );
       }
     };
 
@@ -50,20 +58,20 @@ class FileService {
       fileFilter,
       limits: {
         fileSize: this.maxFileSize,
-        files: 1
-      }
+        files: 1,
+      },
     });
   }
 
   async extractTextFromFile(filePath, fileType) {
     try {
-      let extractedText = '';
+      let extractedText = "";
 
       switch (fileType.toLowerCase()) {
-        case 'pdf':
+        case "pdf":
           extractedText = await this.extractFromPDF(filePath);
           break;
-        case 'docx':
+        case "docx":
           extractedText = await this.extractFromDOCX(filePath);
           break;
         default:
@@ -72,24 +80,30 @@ class FileService {
 
       return this.cleanExtractedText(extractedText);
     } catch (error) {
-      console.error('Text extraction error:', error);
+      console.error("Text extraction error:", error);
       throw new Error(`Failed to extract text from file: ${error.message}`);
     }
   }
 
-  async extractFromPDF(filePath) {
+  async extractFromPDF(fileKey) {
     try {
-      const dataBuffer = await fs.readFile(filePath);
-      const data = await pdfParse(dataBuffer);
-      return data.text;
+      const { Body } = await this.s3.send(new GetObjectCommand({ Bucket: this.bucket, Key: fileKey }));
+      const dataBuffer = await Body.transformToByteArray();
+
+      const data = new PDFParse(dataBuffer);
+      return (await data.getText()).text;
     } catch (error) {
       throw new Error(`PDF extraction failed: ${error.message}`);
     }
   }
 
-  async extractFromDOCX(filePath) {
+  async extractFromDOCX(fileKey) {
     try {
-      const result = await mammoth.extractRawText({ path: filePath });
+      const { Body } = await this.s3.send(new GetObjectCommand({ Bucket: this.bucket, Key: fileKey }));
+      const dataBuffer = await Body.transformToByteArray();
+      const buffer = Buffer.from(dataBuffer);
+
+      const result = await mammoth.extractRawText({ buffer: buffer });
       return result.value;
     } catch (error) {
       throw new Error(`DOCX extraction failed: ${error.message}`);
@@ -97,44 +111,47 @@ class FileService {
   }
 
   cleanExtractedText(text) {
-    if (!text) return '';
+    if (!text) return "";
 
     return text
-      .replace(/\s+/g, ' ') // Replace multiple whitespace with single space
-      .replace(/\n\s*\n/g, '\n') // Remove empty lines
+      .replace(/\s+/g, " ") // Replace multiple whitespace with single space
+      .replace(/\n\s*\n/g, "\n") // Remove empty lines
       .trim();
   }
 
   getFileTypeFromMimeType(mimeType) {
     const mimeToType = {
-      'application/pdf': 'pdf',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
-      'application/msword': 'doc'
+      "application/pdf": "pdf",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+        "docx",
+      "application/msword": "doc",
     };
-    return mimeToType[mimeType] || 'unknown';
+    return mimeToType[mimeType] || "unknown";
   }
 
-  async deleteFile(filePath) {
+  async storeFile(buffer, originalName, mimeType = "application/pdf") {
+    const key = `resumes/${this.generateUniqueFilename(originalName)}`;
+
+    await this.s3.send(new PutObjectCommand({
+      Bucket: this.bucket,
+      Key: key,
+      Body: buffer,
+      ContentType: mimeType
+    }));
+
+    return key;
+  }
+
+  async deleteFile(fileKey) {
     try {
-      await fs.unlink(filePath);
+      await this.s3.send(new DeleteObjectCommand({
+        Bucket: this.bucket,
+        Key: fileKey
+      }))
       return true;
     } catch (error) {
-      console.error('File deletion error:', error);
+      console.error("File deletion error:", error);
       return false;
-    }
-  }
-
-  async getFileStats(filePath) {
-    try {
-      const stats = await fs.stat(filePath);
-      return {
-        size: stats.size,
-        created: stats.birthtime,
-        modified: stats.mtime
-      };
-    } catch (error) {
-      console.error('File stats error:', error);
-      return null;
     }
   }
 
@@ -152,8 +169,9 @@ class FileService {
 
   generateUniqueFilename(originalName) {
     const ext = this.getFileExtension(originalName);
-    return `${uuidv4()}-${Date.now()}${ext}`;
+    return `${v4()}-${Date.now()}${ext}`;
   }
 }
 
-module.exports = new FileService();
+const fileService = new FileService();
+export { fileService };

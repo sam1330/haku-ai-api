@@ -35,6 +35,16 @@ const resumeAnalysisSchema = Joi.object({
   target_company: Joi.string().min(2).max(100).optional(),
 });
 
+// Create resume validation schema
+const resumeSchema = Joi.object({
+  original_filename: Joi.string().required(),
+  metadata: Joi.object({
+      design: Joi.object().required(),
+      cv: Joi.object().required(),
+      locale: Joi.object().required()
+  }).required()
+})
+
 const coverLetterSchema = Joi.object({
   job_description: Joi.string()
     .min(50)
@@ -92,5 +102,6 @@ module.exports = {
   coverLetterSchema,
   jobApplicationSchema,
   updateJobApplicationSchema,
-  forgotPasswordSchema
+  forgotPasswordSchema,
+  resumeSchema
 };

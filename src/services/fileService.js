@@ -87,7 +87,9 @@ export default class FileService {
 
   async extractFromPDF(fileKey) {
     try {
-      const { Body } = await this.s3.send(new GetObjectCommand({ Bucket: this.bucket, Key: fileKey }));
+      const { Body } = await this.s3.send(
+        new GetObjectCommand({ Bucket: this.bucket, Key: fileKey }),
+      );
       const dataBuffer = await Body.transformToByteArray();
 
       const data = new PDFParse(dataBuffer);
@@ -99,7 +101,9 @@ export default class FileService {
 
   async extractFromDOCX(fileKey) {
     try {
-      const { Body } = await this.s3.send(new GetObjectCommand({ Bucket: this.bucket, Key: fileKey }));
+      const { Body } = await this.s3.send(
+        new GetObjectCommand({ Bucket: this.bucket, Key: fileKey }),
+      );
       const dataBuffer = await Body.transformToByteArray();
       const buffer = Buffer.from(dataBuffer);
 
@@ -108,6 +112,38 @@ export default class FileService {
     } catch (error) {
       throw new Error(`DOCX extraction failed: ${error.message}`);
     }
+  }
+
+  /**
+   * Enhanced extraction that captures both the section titles (headers)
+   * and the content within them.
+   */
+  extractTextFromBuilderCv(obj) {
+    let text = "";
+
+    for (const key in obj) {
+      // 1. If the key is a section title (e.g., "experience"), add it to the text
+      // We filter out generic keys like 'cv' or 'metadata'
+      if (isNaN(Number(key)) && key !== "cv" && key !== "design") {
+        text += key + " ";
+      }
+
+      const value = obj[key];
+
+      // 2. Standard recursive extraction for the values
+      if (typeof value === "string") {
+        text += value + " ";
+      } else if (Array.isArray(value)) {
+        value.forEach((item) => {
+          if (typeof item === "string") text += item + " ";
+          else text += this.extractTextFromBuilderCv(item);
+        });
+      } else if (typeof value === "object" && value !== null) {
+        text += this.extractTextFromBuilderCv(value);
+      }
+    }
+
+    return text.trim();
   }
 
   cleanExtractedText(text) {
@@ -132,22 +168,26 @@ export default class FileService {
   async storeFile(buffer, originalName, mimeType = "application/pdf") {
     const key = `resumes/${this.generateUniqueFilename(originalName)}`;
 
-    await this.s3.send(new PutObjectCommand({
-      Bucket: this.bucket,
-      Key: key,
-      Body: buffer,
-      ContentType: mimeType
-    }));
+    await this.s3.send(
+      new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+        Body: buffer,
+        ContentType: mimeType,
+      }),
+    );
 
     return key;
   }
 
   async deleteFile(fileKey) {
     try {
-      await this.s3.send(new DeleteObjectCommand({
-        Bucket: this.bucket,
-        Key: fileKey
-      }))
+      await this.s3.send(
+        new DeleteObjectCommand({
+          Bucket: this.bucket,
+          Key: fileKey,
+        }),
+      );
       return true;
     } catch (error) {
       console.error("File deletion error:", error);

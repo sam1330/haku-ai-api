@@ -11,9 +11,9 @@ exports.up = function (knex) {
         enums.RESUME_SOURCE_TYPES.BUILDER,
       ])
       .defaultTo(enums.RESUME_SOURCE_TYPES.UPLOAD);
-    table.string("file_path").notNullable();
-    table.string("file_type").notNullable(); // 'pdf' or 'docx'
-    table.integer("file_size").notNullable(); // in bytes
+    table.string("file_path").nullable();
+    table.string("file_type").nullable(); // 'pdf' or 'docx'
+    table.integer("file_size").nullable(); // in bytes
     table.text("extracted_text").nullable();
     table.json("metadata").nullable(); // Store additional file metadata
     table.boolean("is_processed").defaultTo(false);

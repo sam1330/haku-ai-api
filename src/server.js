@@ -20,7 +20,16 @@ const PORT = process.env.PORT || 3000;
 
 // Security middleware
 app.use(helmet());
-app.use(compression());
+app.use(compression({
+  filter: (req, res) => {
+    // Don't compress PDF responses
+    if (res.getHeader("Content-Type") === "application/pdf") {
+      return false;
+    }
+    // Use default compression for everything else
+    return compression.filter(req, res);
+  }
+}));
 
 // Rate limiting
 const limiter = rateLimit({

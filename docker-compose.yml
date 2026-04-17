@@ -1,22 +1,18 @@
-version: '3.8'
-
 services:
   api:
     build: .
+    command: >
+      sh -c "npx knex migrate:latest --knexfile ./knexfile.js && 
+             npm run start"
     ports:
       - "3001:3001"
     env_file:
       - .env
     environment:
       - PORT=3001
-      - DB_HOST=db
-      - DB_PORT=5432
-      - DB_URL=postgresql://postgres:postgres@db:5432/resume_ai_db
-      # If using Google Cloud Service Account, ensure the file is in the root as 'service-account.json'
-      # and GOOGLE_APPLICATION_CREDENTIALS=/app/service-account.json in .env
-    volumes:
-      - ./uploads:/app/uploads
-      - ./service-account.json:/app/service-account.json:ro
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - DB_URL=${DB_URL}
     depends_on:
       db:
         condition: service_healthy
@@ -24,12 +20,14 @@ services:
       - app-network
 
   db:
-    image: postgres:15-alpine
+    image: postgres:18-alpine
     restart: always
+    env_file:
+      - .env
     environment:
       - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=resume_ai_db
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=haku_api
     ports:
       - "5432:5432"
     healthcheck:
@@ -38,10 +36,13 @@ services:
       timeout: 5s
       retries: 5
     volumes:
-      - ./postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql
     networks:
       - app-network
 
 networks:
   app-network:
     driver: bridge
+
+volumes:
+  postgres_data:

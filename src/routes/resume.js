@@ -312,6 +312,7 @@ router.post(
         original_filename,
         metadata,
         source: enums.RESUME_SOURCE_TYPES.BUILDER,
+        is_processed: true
       }).returning([
           "id",
           "original_filename",
@@ -330,7 +331,7 @@ router.post(
   },
 );
 
-// Create new resume
+// Update builded resume
 router.put(
   "/:resume_id",
   authenticateToken,

@@ -34,16 +34,17 @@
     "knex": "^3.0.1",
     "mammoth": "^1.6.0",
     "morgan": "^1.10.0",
-    "multer": "^1.4.5-lts.1",
+    "multer": "^2.1.1",
     "pdf-parse": "^2.4.5",
     "pg": "^8.11.3",
+    "playwright": "^1.59.1",
     "resend": "^6.10.0",
+    "supertest": "^7.2.2",
     "uuid": "^9.0.1"
   },
   "devDependencies": {
     "jest": "^29.7.0",
-    "nodemon": "^3.0.2",
-    "supertest": "^6.3.3"
+    "nodemon": "^3.0.2"
   },
   "engines": {
     "node": ">=18.0.0"

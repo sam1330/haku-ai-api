@@ -10,7 +10,6 @@ import {
   GetObjectCommand,
 } from "@aws-sdk/client-s3";
 import { PDFParse } from "pdf-parse";
-import { chromium } from "playwright";
 
 export default class FileService {
   constructor() {
@@ -211,32 +210,6 @@ export default class FileService {
   generateUniqueFilename(originalName) {
     const ext = this.getFileExtension(originalName);
     return `${v4()}-${Date.now()}${ext}`;
-  }
-
-  async generatePDF(resumeId) {
-    const browser = await chromium.launch({
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
-    });
-
-    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
-
-    const context = await browser.newContext();
-    const page = await context.newPage();
-
-    // Navigate to your Next.js print route
-    await page.goto(`${frontendUrl}/print/resume/${resumeId}`, {
-      waitUntil: "networkidle", // Ensures images and fonts are loaded
-    });
-
-    // Generate the PDF as a buffer
-    const pdfBuffer = await page.pdf({
-      format: "Letter",
-      printBackground: true, // Crucial for Tailwind colors and images
-      margin: { top: "0", right: "0", bottom: "0", left: "0" },
-    });
-
-    await browser.close();
-    return pdfBuffer;
   }
 }
 

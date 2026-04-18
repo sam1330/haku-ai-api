@@ -1,5 +1,6 @@
 services:
   api:
+    container_name: haku-ai-api
     build: .
     command: >
       sh -c "npx knex migrate:latest --knexfile ./knexfile.js && 
@@ -10,14 +11,14 @@ services:
       - .env
     environment:
       - PORT=3001
-      - DB_HOST=${DB_HOST}
+      - DB_HOST=db
       - DB_PORT=${DB_PORT}
       - DB_URL=${DB_URL}
     depends_on:
       db:
         condition: service_healthy
     networks:
-      - app-network
+      - haku-network
 
   db:
     image: postgres:18-alpine
@@ -38,11 +39,12 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql
     networks:
-      - app-network
+      - haku-network
 
 networks:
-  app-network:
+  haku-network:
     driver: bridge
+    external: true
 
 volumes:
   postgres_data:

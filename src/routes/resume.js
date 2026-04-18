@@ -9,6 +9,7 @@ const { fileService } = require("../services/fileService");
 const aiService = require("../services/aiService");
 const { checkCredits } = require("../middleware/creditMiddleware");
 const enums = require("../enums");
+const { generatePDF } = require("../services/playwrightService");
 
 const router = express.Router();
 
@@ -505,25 +506,30 @@ router.post(
   async (req, res, next) => {
     try {
       const { resume_id } = req.params;
+      const { locale } = req.body;
 
-      const resume = await db("resumes").where("id", resume_id).select("metadata", "original_filename").first();
-      const pdfEngineURL = process.env.PDG_ENGINE_URL;
+      const authHeader = req.headers['authorization'];
 
-      const response = await fetch(`${pdfEngineURL}/generate`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          metadata: resume.metadata,
-        }),
-      });
+      const resume = await db("resumes")
+        .where("id", resume_id)
+        .where("user_id", req.user.id)
+        .first();
 
-      if (!response.ok) {
-        throw new Error("Failed to generate resume");
-      }
+      // const pdfEngineURL = process.env.PDG_ENGINE_URL;
 
-      const pdfBuffer = Buffer.from(await response.arrayBuffer());
+      // const response = await fetch(`${pdfEngineURL}/generate`, {
+      //   method: "POST",
+      //   headers: {
+      //     "Content-Type": "application/json",
+      //   },
+      //   body: JSON.stringify({
+      //     metadata: resume.metadata,
+      //   }),
+      // });
+
+      const response = await generatePDF(resume_id, locale, authHeader.split(" ")[1]);
+
+      const pdfBuffer = Buffer.from(response);
 
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", `attachment; filename=${resume.original_filename}.pdf`);

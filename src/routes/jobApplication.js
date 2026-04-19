@@ -55,8 +55,7 @@ router.post('/:id/cover-letter', authenticateToken, checkCredits('COVER_LETTER_G
     // Get user's most recent resume
     const resume = await db('resumes')
       .where('user_id', req.user.id)
-      .where('is_processed', true)
-      .orderBy('created_at', 'desc')
+      .where('id', jobApplication.resume_id)
       .first();
 
     if (!resume || !resume.extracted_text) {
@@ -109,12 +108,7 @@ router.post('/:id/cover-letter', authenticateToken, checkCredits('COVER_LETTER_G
 
     res.json({
       message: 'Cover letter generated successfully',
-      cover_letter: coverLetterResult.coverLetter,
-      metadata: {
-        tokens_used: coverLetterResult.tokensUsed,
-        cost: coverLetterResult.cost,
-        model: coverLetterResult.model
-      }
+      cover_letter: coverLetterResult.coverLetter
     });
   } catch (error) {
     next(error);
@@ -178,7 +172,13 @@ router.get('/:id', authenticateToken, async (req, res, next) => {
     }
 
     res.json({
-      job_application: jobApplication
+      job_application: {
+        ...jobApplication,
+        cover_letter_data: {
+          content: jobApplication.cover_letter_data ? jobApplication.cover_letter_data.content : null,
+          generated_at: jobApplication.cover_letter_data ? jobApplication.cover_letter_data.generated_at : null
+        }
+      },
     });
   } catch (error) {
     next(error);

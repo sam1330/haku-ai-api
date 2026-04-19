@@ -108,7 +108,7 @@ class AIService {
           parts: [{ text: "You are a professional career coach and cover letter expert. Write compelling, personalized cover letters that highlight relevant experience and demonstrate genuine interest in the role." }]
         },
         generationConfig: {
-          maxOutputTokens: 1500,
+          maxOutputTokens: 2500,
           temperature: 0.4
         }
       };

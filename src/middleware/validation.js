@@ -46,29 +46,10 @@ const resumeSchema = Joi.object({
 })
 
 const coverLetterSchema = Joi.object({
-  job_description: Joi.string()
-    .min(50)
-    .max(10000)
-    .when("job_application", {
-      is: Joi.exist(),
-      then: Joi.optional(),
-      otherwise: Joi.required(),
-    }),
-  company_name: Joi.string().min(2).max(100).when("job_application", {
-      is: Joi.exist(),
-      then: Joi.optional(),
-      otherwise: Joi.required(),
-    }),
-  position_title: Joi.string().min(2).max(100).when("job_application", {
-      is: Joi.exist(),
-      then: Joi.optional(),
-      otherwise: Joi.required(),
-    }),
   tone: Joi.string()
     .valid("professional", "casual", "enthusiastic")
     .default("professional"),
-  length: Joi.string().valid("short", "medium", "long").default("medium"),
-  job_application: Joi.string().uuid().optional(),
+  length: Joi.string().valid("short", "medium", "long").default("medium")
 });
 
 // Job application validation schemas

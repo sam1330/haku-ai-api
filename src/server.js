@@ -1,10 +1,25 @@
+require('dotenv').config();
+
+const Sentry = require("@sentry/node");
+const { nodeProfilingIntegration } = require("@sentry/profiling-node");
+
+Sentry.init({
+  dsn: process.env.SENTRY_DSN,
+  integrations: [
+    nodeProfilingIntegration(),
+  ],
+  // Tracing
+  tracesSampleRate: 1.0, //  Capture 100% of the transactions
+  // Set sampling rate for profiling
+  profilesSampleRate: 1.0,
+});
+
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
-require('dotenv').config();
 
 const authRoutes = require('./routes/auth');
 const resumeRoutes = require('./routes/resume');
@@ -18,6 +33,10 @@ const { checkDatabaseConnection } = require('./middleware/dbHealth');
 const app = express();
 const PORT = process.env.API_PORT || 3000;
 const HOST = process.env.API_HOST || 'localhost';
+
+app.get("/debug-sentry", function mainHandler(req, res) {
+  throw new Error("My first Sentry error!");
+});
 
 // Security middleware
 app.use(helmet());
@@ -56,8 +75,8 @@ app.use(morgan('combined'));
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-  res.status(200).json({ 
-    status: 'OK', 
+  res.status(200).json({
+    status: 'OK',
     timestamp: new Date().toISOString(),
     uptime: process.uptime()
   });
@@ -69,6 +88,9 @@ app.use('/api/resumes', checkDatabaseConnection, resumeRoutes);
 app.use('/api/job-applications', checkDatabaseConnection, jobApplicationRoutes);
 app.use('/api/dashboard', checkDatabaseConnection, dashboardRoutes);
 app.use('/api/credits', checkDatabaseConnection, creditRoutes);
+
+// Sentry error handler must be before any other error middleware and after all controllers
+Sentry.setupExpressErrorHandler(app);
 
 // Error handling middleware
 app.use(notFound);

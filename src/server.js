@@ -16,8 +16,8 @@ const { notFound } = require('./middleware/notFound');
 const { checkDatabaseConnection } = require('./middleware/dbHealth');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
-const HOST = process.env.HOST || 'localhost';
+const PORT = process.env.API_PORT || 3000;
+const HOST = process.env.API_HOST || 'localhost';
 
 // Security middleware
 app.use(helmet());

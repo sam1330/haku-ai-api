@@ -38,6 +38,7 @@ router.post('/:id/cover-letter', authenticateToken, checkCredits('COVER_LETTER_G
   try {
     const { id } = req.params;
     const { tone, length } = req.body;
+    const locale = req.headers["x-locale"] || "en";
 
     // Get job application
     const jobApplication = await db('job_applications')
@@ -73,7 +74,8 @@ router.post('/:id/cover-letter', authenticateToken, checkCredits('COVER_LETTER_G
       jobApplication.position_title,
       req.user.id,
       tone,
-      length
+      length,
+      locale
     );
 
     // Update job application with cover letter data

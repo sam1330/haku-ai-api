@@ -2,7 +2,7 @@ const { VertexAI } = require('@google-cloud/vertexai');
 const db = require('../config/database');
 const dotenv = require('dotenv');
 const creditService = require('./creditService');
-const { CREDIT_COSTS } = require('../config/constants');
+const { CREDIT_COSTS, LOCALES } = require('../config/constants');
 dotenv.config();
 
 class AIService {
@@ -23,7 +23,7 @@ class AIService {
     this.model = this.vertexAI.preview.getGenerativeModel({ model: this.modelName });
   }
 
-  async analyzeResume(resumeText, jobDescription, targetRole = null, targetCompany = null, userId = null) {
+  async analyzeResume(resumeText, jobDescription, targetRole = null, targetCompany = null, userId = null, locale) {
     let creditTx = null;
     try {
       if (userId) {
@@ -34,13 +34,13 @@ class AIService {
         );
       }
 
-      const prompt = this.buildResumeAnalysisPrompt(resumeText, jobDescription, targetRole, targetCompany);
+      const prompt = this.buildResumeAnalysisPrompt(resumeText, jobDescription, targetRole, targetCompany, locale);
 
       const request = {
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
         systemInstruction: {
           role: 'system',
-          parts: [{ text: "You are an expert resume analyst and career coach. Analyze resumes for ATS compatibility, keyword optimization, and overall effectiveness. Provide specific, actionable feedback. Be extremely concise. Use bullet points within strings. Limit the overview to 3 sentences. Do not over-extend the response, try to keep it under 500 words." }]
+          parts: [{ text: `You are an expert resume analyst and career coach. Analyze resumes for ATS compatibility, keyword optimization, and overall effectiveness. Provide specific, actionable feedback. Be extremely concise. Use bullet points within strings. Limit the overview to 3 sentences. Do not over-extend the response, try to keep it under 500 words. You MUST generate the analysis in the following language: ${LOCALES[locale]}.` }]
         },
         generationConfig: {
           maxOutputTokens: 5000,
@@ -89,7 +89,7 @@ class AIService {
     }
   }
 
-  async generateCoverLetter(resumeText, jobDescription, companyName, positionTitle, userId = null, tone = 'professional', length = 'medium') {
+  async generateCoverLetter(resumeText, jobDescription, companyName, positionTitle, userId = null, tone = 'professional', length = 'medium', locale = 'en') {
     let creditTx = null;
     try {
       if (userId) {
@@ -99,13 +99,13 @@ class AIService {
           'Cover Letter Generation'
         );
       }
-      const prompt = this.buildCoverLetterPrompt(resumeText, jobDescription, companyName, positionTitle, tone, length);
+      const prompt = this.buildCoverLetterPrompt(resumeText, jobDescription, companyName, positionTitle, tone, length, locale);
 
       const request = {
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
         systemInstruction: {
           role: 'system',
-          parts: [{ text: "You are a professional career coach and cover letter expert. Write compelling, personalized cover letters that highlight relevant experience and demonstrate genuine interest in the role." }]
+          parts: [{ text: `You are a professional career coach and cover letter expert. Write compelling, personalized cover letters that highlight relevant experience and demonstrate genuine interest in the role. You must generate the cover letter in the following language: ${LOCALES[locale]}.` }]
         },
         generationConfig: {
           maxOutputTokens: 2500,
@@ -203,15 +203,16 @@ class AIService {
     prompt += `5. Specific Improvement Recommendations\n`;
     prompt += `6. Overall Strengths and Weaknesses\n`;
     prompt += `Format your response as a structured analysis with clear sections.`;
+    prompt += `You must generate the analysis in the following language: ${LOCALES['en']}.`;
 
     return prompt;
   }
 
-  buildCoverLetterPrompt(resumeText, jobDescription, companyName, positionTitle, tone, length) {
+  buildCoverLetterPrompt(resumeText, jobDescription, companyName, positionTitle, tone, length, locale = 'en') {
     const lengthInstructions = {
-      short: 'Keep it concise (150-200 words)',
-      medium: 'Write a standard length cover letter (250-350 words)',
-      long: 'Write a detailed cover letter (400-500 words)'
+      short: 'Keep it concise (50-150 words)',
+      medium: 'Write a standard length cover letter (150-250 words)',
+      long: 'Write a detailed cover letter (300-450 words)'
     };
 
     const toneInstructions = {
@@ -220,7 +221,7 @@ class AIService {
       enthusiastic: 'Use an energetic, passionate tone that shows excitement'
     };
 
-    let prompt = `Write a ${tone} cover letter for the ${positionTitle} position at ${companyName}.\n\n`;
+    let prompt = `Write a ${tone} cover letter in ${LOCALES[locale]} for the ${positionTitle} position at ${companyName}.\n\n`;
     prompt += `TONE: ${toneInstructions[tone]}\n`;
     prompt += `LENGTH: ${lengthInstructions[length]}\n\n`;
     prompt += `JOB DESCRIPTION:\n${jobDescription}\n\n`;

@@ -94,6 +94,7 @@ router.post(
     try {
       const { job_description, target_role, target_company } = req.body;
       const { resume_id } = req.params;
+      const locale = req.headers["x-locale"] || "en";
 
       if (!resume_id) {
         return res.status(400).json({
@@ -129,6 +130,7 @@ router.post(
         target_role,
         target_company,
         req.user.id,
+        locale
       );
 
       // Save analysis results to the new table

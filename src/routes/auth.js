@@ -25,6 +25,7 @@ function generateVerificationToken() {
 router.post("/register", validate(registerSchema), async (req, res, next) => {
   try {
     const { email, password, first_name, last_name } = req.body;
+    const locale = req.headers["x-locale"] || "en";
 
     // Check if user already exists
     const existingUser = await db("users").where("email", email).first();
@@ -70,6 +71,7 @@ router.post("/register", validate(registerSchema), async (req, res, next) => {
       email,
       first_name,
       verificationToken,
+      locale
     );
 
     if (!emailResult.success) {
@@ -103,7 +105,7 @@ router.post("/login", validate(loginSchema), async (req, res, next) => {
     // Find user
     const user = await db("users").where("email", email).first();
     if (!user) {
-      return res.status(401).json({
+      return res.status(403).json({
         error: "Invalid email or password",
         code: "INVALID_CREDENTIALS",
       });
@@ -111,7 +113,7 @@ router.post("/login", validate(loginSchema), async (req, res, next) => {
 
     // Check if account is active
     if (!user.is_active) {
-      return res.status(401).json({
+      return res.status(403).json({
         error: "Account is deactivated",
         code: "ACCOUNT_DEACTIVATED",
       });
@@ -129,7 +131,7 @@ router.post("/login", validate(loginSchema), async (req, res, next) => {
     // Verify password
     const isValidPassword = await bcrypt.compare(password, user.password_hash);
     if (!isValidPassword) {
-      return res.status(401).json({
+      return res.status(403).json({
         error: "Invalid email or password",
         code: "INVALID_CREDENTIALS",
       });
@@ -298,7 +300,7 @@ router.put("/change-password", authenticateToken, async (req, res, next) => {
       user.password_hash,
     );
     if (!isValidPassword) {
-      return res.status(401).json({
+      return res.status(403).json({
         error: "Current password is incorrect",
         code: "INVALID_CURRENT_PASSWORD",
       });
@@ -328,6 +330,7 @@ router.post(
   async (req, res, next) => {
     try {
       const { email } = req.body;
+      const locale = req.headers["x-locale"] || "en";
 
       if (!email) {
         return res.status(400).json({
@@ -364,6 +367,7 @@ router.post(
         email,
         user.first_name,
         verificationToken,
+        locale
       );
 
       if (email.error) {
@@ -474,6 +478,7 @@ router.post("/verify-email", async (req, res, next) => {
 router.post("/resend-verification", async (req, res, next) => {
   try {
     const { email } = req.body;
+    const locale = req.headers["x-locale"] || "en";
 
     if (!email) {
       return res.status(400).json({
@@ -515,6 +520,7 @@ router.post("/resend-verification", async (req, res, next) => {
       user.email,
       user.first_name,
       verificationToken,
+      locale,
     );
 
     if (!emailResult.success) {

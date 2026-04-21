@@ -55,14 +55,6 @@ class CreditService {
       // Decrement credits
       await trx("users").where("id", userId).decrement("credits", amount);
 
-      console.log({
-        amount: typeof amount,
-        description: description.length,
-        metadata: JSON.stringify(metadata).length,
-        transaction_type: TRANSACTION_TYPES.USAGE.length,
-        user_id: userId.length,
-      });
-
       // Create transaction record
       const [transaction] = await trx("credit_transactions")
         .insert({

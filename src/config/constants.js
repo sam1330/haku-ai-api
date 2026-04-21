@@ -12,5 +12,9 @@ module.exports = {
     REFUND: 'refund',
     BONUS: 'bonus'
   },
-  DEFAULT_WELCOME_CREDITS: 30
+  DEFAULT_WELCOME_CREDITS: 30,
+  LOCALES: {
+    es: 'Spanish',
+    en: 'English'
+  }
 };

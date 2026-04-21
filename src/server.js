@@ -34,10 +34,6 @@ const app = express();
 const PORT = process.env.API_PORT || 3000;
 const HOST = process.env.API_HOST || 'localhost';
 
-app.get("/debug-sentry", function mainHandler(req, res) {
-  throw new Error("My first Sentry error!");
-});
-
 // Security middleware
 app.use(helmet());
 app.use(compression({
@@ -64,6 +60,15 @@ app.use(limiter);
 app.use(cors({
   origin: process.env.CORS_ORIGIN || 'http://localhost:3001',
   credentials: true
+}));
+
+app.use(express.json({
+  verify: (req, res, buf) => {
+    // If the URL is our webhook, attach the raw buffer to the request
+    if (req.originalUrl.startsWith('/api/credits/webhook')) {
+      req.rawBody = buf;
+    }
+  }
 }));
 
 // Body parsing middleware

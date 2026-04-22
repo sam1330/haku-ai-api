@@ -1,11 +1,11 @@
-const errorHandler = (err, req, res, next) => {
+const errorHandler = (err, req, res) => {
   console.error('Error:', err);
 
   // Default error
   let error = {
     message: err.message || 'Internal Server Error',
     status: err.status || 500,
-    code: err.code || 'INTERNAL_ERROR'
+    code: err.code || 'INTERNAL_ERROR',
   };
 
   // JWT errors
@@ -13,7 +13,7 @@ const errorHandler = (err, req, res, next) => {
     error = {
       message: 'Invalid token',
       status: 401,
-      code: 'INVALID_TOKEN'
+      code: 'INVALID_TOKEN',
     };
   }
 
@@ -21,7 +21,7 @@ const errorHandler = (err, req, res, next) => {
     error = {
       message: 'Token expired',
       status: 401,
-      code: 'TOKEN_EXPIRED'
+      code: 'TOKEN_EXPIRED',
     };
   }
 
@@ -31,27 +31,29 @@ const errorHandler = (err, req, res, next) => {
       message: 'Validation error',
       status: 400,
       code: 'VALIDATION_ERROR',
-      details: err.details.map(detail => ({
+      details: err.details.map((detail) => ({
         field: detail.path.join('.'),
-        message: detail.message
-      }))
+        message: detail.message,
+      })),
     };
   }
 
   // Database errors
-  if (err.code === '23505') { // Unique violation
+  if (err.code === '23505') {
+    // Unique violation
     error = {
       message: 'Resource already exists',
       status: 409,
-      code: 'DUPLICATE_RESOURCE'
+      code: 'DUPLICATE_RESOURCE',
     };
   }
 
-  if (err.code === '23503') { // Foreign key violation
+  if (err.code === '23503') {
+    // Foreign key violation
     error = {
       message: 'Referenced resource not found',
       status: 400,
-      code: 'REFERENCE_ERROR'
+      code: 'REFERENCE_ERROR',
     };
   }
 
@@ -60,7 +62,7 @@ const errorHandler = (err, req, res, next) => {
     error = {
       message: 'File too large',
       status: 413,
-      code: 'FILE_TOO_LARGE'
+      code: 'FILE_TOO_LARGE',
     };
   }
 
@@ -68,7 +70,7 @@ const errorHandler = (err, req, res, next) => {
     error = {
       message: 'Unexpected file field',
       status: 400,
-      code: 'INVALID_FILE_FIELD'
+      code: 'INVALID_FILE_FIELD',
     };
   }
 
@@ -77,7 +79,7 @@ const errorHandler = (err, req, res, next) => {
     error = {
       message: 'AI service quota exceeded',
       status: 503,
-      code: 'AI_QUOTA_EXCEEDED'
+      code: 'AI_QUOTA_EXCEEDED',
     };
   }
 
@@ -91,7 +93,7 @@ const errorHandler = (err, req, res, next) => {
     error: error.message,
     code: error.code,
     ...(error.details && { details: error.details }),
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+    ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
   });
 };
 

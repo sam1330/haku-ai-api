@@ -239,7 +239,7 @@
               ]
             },
             "url": {
-              "raw": "{{base_url}}/api/resume/upload",
+              "raw": "{{base_url}}/api/resumes/upload",
               "host": ["{{base_url}}"],
               "path": ["api", "resume", "upload"]
             }
@@ -252,7 +252,7 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/api/resume?page=1&limit=10",
+              "raw": "{{base_url}}/api/resumes?page=1&limit=10",
               "host": ["{{base_url}}"],
               "path": ["api", "resume"],
               "query": [
@@ -275,7 +275,7 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/api/resume/{{resume_id}}",
+              "raw": "{{base_url}}/api/resumes/{{resume_id}}",
               "host": ["{{base_url}}"],
               "path": ["api", "resume", "{{resume_id}}"]
             }
@@ -288,7 +288,7 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/api/resume/{{resume_id}}/text",
+              "raw": "{{base_url}}/api/resumes/{{resume_id}}/text",
               "host": ["{{base_url}}"],
               "path": ["api", "resume", "{{resume_id}}", "text"]
             }
@@ -310,7 +310,7 @@
               "raw": "{\n  \"job_description\": \"We are looking for a Senior Software Engineer with 5+ years of experience in Node.js, React, and PostgreSQL. The ideal candidate should have experience with AI/ML integration, microservices architecture, and cloud deployment. Responsibilities include developing scalable web applications, mentoring junior developers, and collaborating with cross-functional teams.\",\n  \"target_role\": \"Senior Software Engineer\",\n  \"target_company\": \"Tech Corp\"\n}"
             },
             "url": {
-              "raw": "{{base_url}}/api/resume/analyze?resume_id={{resume_id}}",
+              "raw": "{{base_url}}/api/resumes/analyze?resume_id={{resume_id}}",
               "host": ["{{base_url}}"],
               "path": ["api", "resume", "analyze"],
               "query": [
@@ -338,7 +338,7 @@
               "raw": "{\n  \"job_description\": \"We are looking for a Senior Software Engineer with 5+ years of experience in Node.js, React, and PostgreSQL. The ideal candidate should have experience with AI/ML integration, microservices architecture, and cloud deployment.\",\n  \"target_role\": \"Senior Software Engineer\"\n}"
             },
             "url": {
-              "raw": "{{base_url}}/api/resume/optimize?resume_id={{resume_id}}",
+              "raw": "{{base_url}}/api/resumes/optimize?resume_id={{resume_id}}",
               "host": ["{{base_url}}"],
               "path": ["api", "resume", "optimize"],
               "query": [
@@ -357,7 +357,7 @@
             "method": "DELETE",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/api/resume/{{resume_id}}",
+              "raw": "{{base_url}}/api/resumes/{{resume_id}}",
               "host": ["{{base_url}}"],
               "path": ["api", "resume", "{{resume_id}}"]
             }
@@ -398,7 +398,7 @@
               "raw": "{\n  \"company_name\": \"Tech Corp\",\n  \"position_title\": \"Senior Software Engineer\",\n  \"job_description\": \"We are looking for a Senior Software Engineer with 5+ years of experience in Node.js, React, and PostgreSQL. The ideal candidate should have experience with AI/ML integration, microservices architecture, and cloud deployment.\",\n  \"application_url\": \"https://techcorp.com/careers/senior-software-engineer\",\n  \"application_deadline\": \"2024-02-15T23:59:59Z\",\n  \"notes\": \"Great opportunity with competitive salary and benefits\"\n}"
             },
             "url": {
-              "raw": "{{base_url}}/api/job-application",
+              "raw": "{{base_url}}/api/job-applications",
               "host": ["{{base_url}}"],
               "path": ["api", "job-application"]
             }
@@ -411,7 +411,7 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/api/job-application?page=1&limit=10&status=draft",
+              "raw": "{{base_url}}/api/job-applications?page=1&limit=10&status=draft",
               "host": ["{{base_url}}"],
               "path": ["api", "job-application"],
               "query": [
@@ -438,7 +438,7 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/api/job-application/{{job_application_id}}",
+              "raw": "{{base_url}}/api/job-applications/{{job_application_id}}",
               "host": ["{{base_url}}"],
               "path": ["api", "job-application", "{{job_application_id}}"]
             }
@@ -460,7 +460,7 @@
               "raw": "{\n  \"status\": \"applied\",\n  \"notes\": \"Applied on 2024-01-15. Waiting for response.\"\n}"
             },
             "url": {
-              "raw": "{{base_url}}/api/job-application/{{job_application_id}}",
+              "raw": "{{base_url}}/api/job-applications/{{job_application_id}}",
               "host": ["{{base_url}}"],
               "path": ["api", "job-application", "{{job_application_id}}"]
             }
@@ -482,7 +482,7 @@
               "raw": "{\n  \"tone\": \"professional\",\n  \"length\": \"medium\"\n}"
             },
             "url": {
-              "raw": "{{base_url}}/api/job-application/{{job_application_id}}/cover-letter",
+              "raw": "{{base_url}}/api/job-applications/{{job_application_id}}/cover-letter",
               "host": ["{{base_url}}"],
               "path": ["api", "job-application", "{{job_application_id}}", "cover-letter"]
             }
@@ -495,7 +495,7 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/api/job-application/{{job_application_id}}/cover-letter",
+              "raw": "{{base_url}}/api/job-applications/{{job_application_id}}/cover-letter",
               "host": ["{{base_url}}"],
               "path": ["api", "job-application", "{{job_application_id}}", "cover-letter"]
             }
@@ -508,7 +508,7 @@
             "method": "DELETE",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/api/job-application/{{job_application_id}}",
+              "raw": "{{base_url}}/api/job-applications/{{job_application_id}}",
               "host": ["{{base_url}}"],
               "path": ["api", "job-application", "{{job_application_id}}"]
             }
@@ -617,7 +617,7 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/api/resume",
+              "raw": "{{base_url}}/api/resumes",
               "host": ["{{base_url}}"],
               "path": ["api", "resume"]
             }
@@ -641,7 +641,7 @@
               ]
             },
             "url": {
-              "raw": "{{base_url}}/api/resume/upload",
+              "raw": "{{base_url}}/api/resumes/upload",
               "host": ["{{base_url}}"],
               "path": ["api", "resume", "upload"]
             }

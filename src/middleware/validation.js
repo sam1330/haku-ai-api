@@ -1,10 +1,11 @@
-const Joi = require("joi");
+const Joi = require('joi');
 
 const validate = (schema) => {
   return (req, res, next) => {
     const { error } = schema.validate(req.body);
     if (error) {
       error.isJoi = true;
+      error.status = 422;
       return next(error);
     }
     next();
@@ -39,17 +40,17 @@ const resumeAnalysisSchema = Joi.object({
 const resumeSchema = Joi.object({
   original_filename: Joi.string().required(),
   metadata: Joi.object({
-      design: Joi.object().required(),
-      cv: Joi.object().required(),
-      locale: Joi.object().required()
-  }).required()
-})
+    design: Joi.object().required(),
+    cv: Joi.object().required(),
+    locale: Joi.object().required(),
+  }).required(),
+});
 
 const coverLetterSchema = Joi.object({
   tone: Joi.string()
-    .valid("professional", "casual", "enthusiastic")
-    .default("professional"),
-  length: Joi.string().valid("short", "medium", "long").default("medium")
+    .valid('professional', 'casual', 'enthusiastic')
+    .default('professional'),
+  length: Joi.string().valid('short', 'medium', 'long').default('medium'),
 });
 
 // Job application validation schemas
@@ -57,9 +58,9 @@ const jobApplicationSchema = Joi.object({
   company_name: Joi.string().min(2).max(100).required(),
   position_title: Joi.string().min(2).max(100).required(),
   job_description: Joi.string().min(50).max(10000).required(),
-  application_url: Joi.string().uri().optional().allow(""),
-  application_deadline: Joi.date().optional().allow(""),
-  notes: Joi.string().max(1000).optional().allow(""),
+  application_url: Joi.string().uri().optional().allow(''),
+  application_deadline: Joi.date().optional().allow(''),
+  notes: Joi.string().max(1000).optional().allow(''),
   resume_id: Joi.string().uuid().required(),
 });
 
@@ -71,7 +72,7 @@ const updateJobApplicationSchema = Joi.object({
   application_deadline: Joi.date().optional(),
   notes: Joi.string().max(1000).optional(),
   status: Joi.string()
-    .valid("draft", "applied", "interview", "rejected", "accepted")
+    .valid('draft', 'applied', 'interview', 'rejected', 'accepted')
     .optional(),
 });
 
@@ -84,5 +85,5 @@ module.exports = {
   jobApplicationSchema,
   updateJobApplicationSchema,
   forgotPasswordSchema,
-  resumeSchema
+  resumeSchema,
 };

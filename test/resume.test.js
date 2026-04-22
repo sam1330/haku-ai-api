@@ -41,10 +41,10 @@ describe('Resume Integration Tests', () => {
     await db.destroy();
   });
 
-  describe('GET /api/resume', () => {
+  describe('GET /api/resumes', () => {
     test('should return empty list initially', async () => {
       const response = await request(app)
-        .get('/api/resume')
+        .get('/api/resumes')
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
@@ -64,7 +64,7 @@ describe('Resume Integration Tests', () => {
       });
 
       const response = await request(app)
-        .get('/api/resume')
+        .get('/api/resumes')
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
@@ -75,7 +75,7 @@ describe('Resume Integration Tests', () => {
     });
   });
 
-  describe('GET /api/resume/:id', () => {
+  describe('GET /api/resumes/:id', () => {
     let resumeId;
 
     beforeAll(async () => {
@@ -95,7 +95,7 @@ describe('Resume Integration Tests', () => {
 
     test('should get resume details', async () => {
       const response = await request(app)
-        .get(`/api/resume/${resumeId}`)
+        .get(`/api/resumes/${resumeId}`)
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
@@ -106,13 +106,13 @@ describe('Resume Integration Tests', () => {
 
     test('should return 404 for non-existent resume', async () => {
       await request(app)
-        .get('/api/resume/00000000-0000-0000-0000-000000000000')
+        .get('/api/resumes/00000000-0000-0000-0000-000000000000')
         .set('Authorization', `Bearer ${token}`)
         .expect(404);
     });
   });
 
-  describe('POST /api/resume/upload', () => {
+  describe('POST /api/resumes/upload', () => {
     beforeAll(() => {
       fs.writeFileSync(filePath, 'test-resume.pdf');
     });
@@ -132,7 +132,7 @@ describe('Resume Integration Tests', () => {
         .mockResolvedValue('This is mocked extracted text content');
 
       const response = await request(app)
-        .post('/api/resume/upload')
+        .post('/api/resumes/upload')
         .set('Authorization', `Bearer ${token}`)
         .attach('resume', filePath)
         .expect(201);
@@ -150,7 +150,7 @@ describe('Resume Integration Tests', () => {
     }, 10000);
   });
 
-  describe('DELETE /api/resume/:id', () => {
+  describe('DELETE /api/resumes/:id', () => {
     let resumeId;
 
     beforeEach(async () => {
@@ -190,13 +190,13 @@ describe('Resume Integration Tests', () => {
         .mockResolvedValue(true);
 
       await request(app)
-        .post('/api/resume/upload')
+        .post('/api/resumes/upload')
         .set('Authorization', `Bearer ${token}`)
         .attach('resume', filePath)
         .expect(201);
 
       const response = await request(app)
-        .delete(`/api/resume/${resumeId}`)
+        .delete(`/api/resumes/${resumeId}`)
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 

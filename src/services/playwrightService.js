@@ -1,4 +1,5 @@
-import { chromium } from 'playwright';
+// import { chromium } from 'playwright';
+const { chromium } = require('playwright');
 let browser; // Global or singleton browser instance
 
 async function getBrowser() {
@@ -15,7 +16,7 @@ async function getBrowser() {
   return browser;
 }
 
-export async function generatePDF(resumeId, locale, authToken) {
+async function generatePDF(resumeId, locale, authToken) {
   const instance = await getBrowser();
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
 
@@ -48,3 +49,5 @@ export async function generatePDF(resumeId, locale, authToken) {
     await context.close();
   }
 }
+
+module.exports = { generatePDF };

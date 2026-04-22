@@ -111,22 +111,22 @@ A comprehensive Node.js backend for an AI-powered resume analysis and job applic
 - `POST /api/auth/logout` - Logout
 
 ### Resume Management
-- `POST /api/resume/upload` - Upload resume (PDF/DOCX)
-- `POST /api/resume/analyze` - Analyze resume with AI
-- `POST /api/resume/optimize` - Optimize resume (Pro only)
-- `GET /api/resume` - Get user's resumes
-- `GET /api/resume/:id` - Get specific resume
-- `GET /api/resume/:id/text` - Get resume text
-- `DELETE /api/resume/:id` - Delete resume
+- `POST /api/resumes/upload` - Upload resume (PDF/DOCX)
+- `POST /api/resumes/analyze` - Analyze resume with AI
+- `POST /api/resumes/optimize` - Optimize resume (Pro only)
+- `GET /api/resumes` - Get user's resumes
+- `GET /api/resumes/:id` - Get specific resume
+- `GET /api/resumes/:id/text` - Get resume text
+- `DELETE /api/resumes/:id` - Delete resume
 
 ### Job Applications
-- `POST /api/job-application` - Create job application
-- `POST /api/job-application/:id/cover-letter` - Generate cover letter
-- `GET /api/job-application` - Get job applications
-- `GET /api/job-application/:id` - Get specific application
-- `PUT /api/job-application/:id` - Update application
-- `DELETE /api/job-application/:id` - Delete application
-- `GET /api/job-application/:id/cover-letter` - Get cover letter
+- `POST /api/job-applications` - Create job application
+- `POST /api/job-applications/:id/cover-letter` - Generate cover letter
+- `GET /api/job-applications` - Get job applications
+- `GET /api/job-applications/:id` - Get specific application
+- `PUT /api/job-applications/:id` - Update application
+- `DELETE /api/job-applications/:id` - Delete application
+- `GET /api/job-applications/:id/cover-letter` - Get cover letter
 
 ### Dashboard
 - `GET /api/dashboard/overview` - Dashboard overview

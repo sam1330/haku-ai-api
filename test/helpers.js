@@ -55,7 +55,7 @@ const createTestUser = async (overrides = {}) => {
       '$2a$12$LQv3c1yqBWVHxkd0LqCF7uQyxLp/X/8.f.f.f.f.f.f.f.f.f.f.f', // "password123"
     first_name: 'Test',
     last_name: 'User',
-    subscription_type: 'free',
+    subscription_type: 'candidate',
     is_active: true,
   };
 

@@ -39,7 +39,7 @@ describe('Job Application Integration Tests', () => {
     await db.destroy();
   });
 
-  describe('POST /api/job-application', () => {
+  describe('POST /api/job-applications', () => {
     const validApplication = {
       company_name: 'Tech Corp',
       position_title: 'Software Engineer',
@@ -52,7 +52,7 @@ describe('Job Application Integration Tests', () => {
 
     test('should create a job application successfully', async () => {
       const response = await request(app)
-        .post('/api/job-application')
+        .post('/api/job-applications')
         .set('Authorization', `Bearer ${token}`)
         .send({ ...validApplication, resume_id: resumeId })
         .expect(201);
@@ -68,17 +68,17 @@ describe('Job Application Integration Tests', () => {
     test('should fail without company name', async () => {
       const invalid = { ...validApplication, company_name: '' };
       await request(app)
-        .post('/api/job-application')
+        .post('/api/job-applications')
         .set('Authorization', `Bearer ${token}`)
         .send(invalid)
-        .expect(400);
+        .expect(422);
     });
   });
 
-  describe('GET /api/job-application', () => {
+  describe('GET /api/job-applications', () => {
     test('should return list of job applications', async () => {
       const response = await request(app)
-        .get('/api/job-application')
+        .get('/api/job-applications')
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
@@ -87,7 +87,7 @@ describe('Job Application Integration Tests', () => {
     });
   });
 
-  describe('GET /api/job-application/:id', () => {
+  describe('GET /api/job-applications/:id', () => {
     let jobId;
 
     beforeAll(async () => {
@@ -107,7 +107,7 @@ describe('Job Application Integration Tests', () => {
 
     test('should get a specific job application', async () => {
       const response = await request(app)
-        .get(`/api/job-application/${jobId}`)
+        .get(`/api/job-applications/${jobId}`)
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
@@ -117,13 +117,13 @@ describe('Job Application Integration Tests', () => {
 
     test('should return 404 for non-existent job', async () => {
       await request(app)
-        .get('/api/job-application/00000000-0000-0000-0000-000000000000') // UUID or 0 if integer
+        .get('/api/job-applications/00000000-0000-0000-0000-000000000000') // UUID or 0 if integer
         .set('Authorization', `Bearer ${token}`)
         .expect(404);
     });
   });
 
-  describe('PUT /api/job-application/:id', () => {
+  describe('PUT /api/job-applications/:id', () => {
     let jobId;
 
     beforeAll(async () => {
@@ -143,7 +143,7 @@ describe('Job Application Integration Tests', () => {
 
     test('should update a job application status', async () => {
       const response = await request(app)
-        .put(`/api/job-application/${jobId}`)
+        .put(`/api/job-applications/${jobId}`)
         .set('Authorization', `Bearer ${token}`)
         .send({ status: 'applied' })
         .expect(200);
@@ -153,7 +153,7 @@ describe('Job Application Integration Tests', () => {
 
     test('should update company name', async () => {
       const response = await request(app)
-        .put(`/api/job-application/${jobId}`)
+        .put(`/api/job-applications/${jobId}`)
         .set('Authorization', `Bearer ${token}`)
         .send({ company_name: 'New Corp Name' })
         .expect(200);
@@ -162,7 +162,7 @@ describe('Job Application Integration Tests', () => {
     });
   });
 
-  describe('DELETE /api/job-application/:id', () => {
+  describe('DELETE /api/job-applications/:id', () => {
     let jobId;
 
     beforeEach(async () => {
@@ -182,7 +182,7 @@ describe('Job Application Integration Tests', () => {
 
     test('should delete a job application', async () => {
       await request(app)
-        .delete(`/api/job-application/${jobId}`)
+        .delete(`/api/job-applications/${jobId}`)
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 

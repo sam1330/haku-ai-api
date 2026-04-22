@@ -1,17 +1,29 @@
-import multer from 'multer';
-import path from 'path';
-import mammoth from 'mammoth';
-import { v4 } from 'uuid';
-import {
+// import multer from 'multer';
+// import path from 'path';
+// import mammoth from 'mammoth';
+// import { v4 } from 'uuid';
+// import {
+//   S3Client,
+//   PutObjectCommand,
+//   DeleteObjectCommand,
+//   paginateListObjectsV2,
+//   GetObjectCommand,
+// } from '@aws-sdk/client-s3';
+// import { PDFParse } from 'pdf-parse';
+
+const multer = require('multer');
+const path = require('path');
+const mammoth = require('mammoth');
+const { v4 } = require('uuid');
+const {
   S3Client,
   PutObjectCommand,
   DeleteObjectCommand,
-  paginateListObjectsV2,
   GetObjectCommand,
-} from '@aws-sdk/client-s3';
-import { PDFParse } from 'pdf-parse';
+} = require('@aws-sdk/client-s3');
+const { PDFParse } = require('pdf-parse');
 
-export default class FileService {
+class FileService {
   constructor() {
     this.maxFileSize = parseInt(process.env.MAX_FILE_SIZE) || 10 * 1024 * 1024; // 10MB
     this.allowedMimeTypes = [
@@ -214,4 +226,5 @@ export default class FileService {
 }
 
 const fileService = new FileService();
-export { fileService };
+
+module.exports = fileService;

@@ -1,5 +1,5 @@
-const db = require("../config/database");
-const { TRANSACTION_TYPES } = require("../config/constants");
+const db = require('../config/database');
+const { TRANSACTION_TYPES } = require('../config/constants');
 
 class CreditService {
   /**
@@ -8,9 +8,9 @@ class CreditService {
    * @returns {Promise<number>}
    */
   async getUserCredits(userId) {
-    const user = await db("users")
-      .where("id", userId)
-      .select("credits")
+    const user = await db('users')
+      .where('id', userId)
+      .select('credits')
       .first();
 
     return user ? user.credits : 0;
@@ -38,25 +38,25 @@ class CreditService {
   async deductCredits(userId, amount, description, metadata = {}) {
     return await db.transaction(async (trx) => {
       // Get user with lock for update to prevent race conditions
-      const user = await trx("users")
-        .where("id", userId)
-        .select("credits")
+      const user = await trx('users')
+        .where('id', userId)
+        .select('credits')
         .first()
         .forUpdate();
 
       if (!user) {
-        throw new Error("User not found");
+        throw new Error('User not found');
       }
 
       if (user.credits < amount) {
-        throw new Error("Insufficient credits");
+        throw new Error('Insufficient credits');
       }
 
       // Decrement credits
-      await trx("users").where("id", userId).decrement("credits", amount);
+      await trx('users').where('id', userId).decrement('credits', amount);
 
       // Create transaction record
-      const [transaction] = await trx("credit_transactions")
+      const [transaction] = await trx('credit_transactions')
         .insert({
           amount: -amount,
           description: description,
@@ -64,7 +64,7 @@ class CreditService {
           transaction_type: TRANSACTION_TYPES.USAGE,
           user_id: userId,
         })
-        .returning("*");
+        .returning('*');
 
       return transaction;
     });
@@ -80,47 +80,47 @@ class CreditService {
   async refundCredits(userId, originalTransactionId, reason) {
     return await db.transaction(async (trx) => {
       // Find original transaction
-      const originalTx = await trx("credit_transactions")
+      const originalTx = await trx('credit_transactions')
         .where({ id: originalTransactionId, user_id: userId })
         .first();
 
       if (!originalTx) {
-        throw new Error("Original transaction not found");
+        throw new Error('Original transaction not found');
       }
 
       if (originalTx.transaction_type !== TRANSACTION_TYPES.USAGE) {
-        throw new Error("Can only refund usage transactions");
+        throw new Error('Can only refund usage transactions');
       }
 
       // Check if already refunded (simple check in metadata for now)
       const parsedMeta =
-        typeof originalTx.metadata === "string"
+        typeof originalTx.metadata === 'string'
           ? JSON.parse(originalTx.metadata)
           : originalTx.metadata || {};
 
       if (parsedMeta.refunded) {
-        throw new Error("Transaction already refunded");
+        throw new Error('Transaction already refunded');
       }
 
       const refundAmount = Math.abs(originalTx.amount);
 
       // Increment credits
-      await trx("users").where("id", userId).increment("credits", refundAmount);
+      await trx('users').where('id', userId).increment('credits', refundAmount);
 
       // Mark original as refunded
       const updatedMetadata =
-        typeof originalTx.metadata === "string"
+        typeof originalTx.metadata === 'string'
           ? JSON.parse(originalTx.metadata)
           : originalTx.metadata || {};
       updatedMetadata.refunded = true;
       updatedMetadata.refund_reason = reason;
 
-      await trx("credit_transactions")
-        .where("id", originalTransactionId)
+      await trx('credit_transactions')
+        .where('id', originalTransactionId)
         .update({ metadata: JSON.stringify(updatedMetadata) });
 
       // Create refund transaction record
-      const [refundTx] = await trx("credit_transactions")
+      const [refundTx] = await trx('credit_transactions')
         .insert({
           user_id: userId,
           amount: refundAmount,
@@ -130,7 +130,7 @@ class CreditService {
             original_transaction_id: originalTransactionId,
           }),
         })
-        .returning("*");
+        .returning('*');
 
       return refundTx;
     });
@@ -147,9 +147,9 @@ class CreditService {
    */
   async addCredits(userId, amount, type, description, options = {}) {
     return await db.transaction(async (trx) => {
-      await trx("users").where("id", userId).increment("credits", amount);
+      await trx('users').where('id', userId).increment('credits', amount);
 
-      const [transaction] = await trx("credit_transactions")
+      const [transaction] = await trx('credit_transactions')
         .insert({
           user_id: userId,
           amount: amount,
@@ -158,7 +158,7 @@ class CreditService {
           metadata: options.metadata ? JSON.stringify(options.metadata) : null,
           expires_at: options.expiresAt || null,
         })
-        .returning("*");
+        .returning('*');
 
       return transaction;
     });
@@ -172,9 +172,9 @@ class CreditService {
    * @returns {Promise<Array>}
    */
   async getTransactionHistory(userId, limit = 20, offset = 0) {
-    return await db("credit_transactions")
-      .where("user_id", userId)
-      .orderBy("created_at", "desc")
+    return await db('credit_transactions')
+      .where('user_id', userId)
+      .orderBy('created_at', 'desc')
       .limit(limit)
       .offset(offset);
   }

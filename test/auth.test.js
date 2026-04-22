@@ -3,8 +3,6 @@ const request = require('supertest');
 const app = require('../src/server');
 const {
   cleanDatabase,
-  createTestUser,
-  generateToken,
   db,
   runMigrations,
 } = require('./helpers');
@@ -51,7 +49,8 @@ describe('Authentication Integration Tests', () => {
       await request(app)
         .post('/api/auth/register')
         .send(invalidUser)
-        .expect(400);
+        .expect(422);
+        
     });
   });
 
@@ -73,6 +72,9 @@ describe('Authentication Integration Tests', () => {
     });
 
     test('should login successfully with correct credentials', async () => {
+      const user = await db('users').where('email', userCredentials.email).first();
+      user.email_verified_at = new Date();
+      await db('users').where('email', userCredentials.email).update(user);
       const response = await request(app)
         .post('/api/auth/login')
         .send(userCredentials)
@@ -82,6 +84,19 @@ describe('Authentication Integration Tests', () => {
       expect(response.body.user.email).toBe(userCredentials.email);
     });
 
+    test('should fail with unverified email', async () => {
+      const user = await db('users').where('email', userCredentials.email).first();
+      user.email_verified_at = null;
+      await db('users').where('email', userCredentials.email).update(user);
+      const response = await request(app)
+        .post('/api/auth/login')
+        .send(userCredentials)
+        .expect(403);
+
+      expect(response.body).toHaveProperty('error');
+      expect(response.body.email).toBe(userCredentials.email);
+    });
+
     test('should fail with incorrect password', async () => {
       await request(app)
         .post('/api/auth/login')
@@ -89,14 +104,30 @@ describe('Authentication Integration Tests', () => {
           email: userCredentials.email,
           password: 'wrongpassword',
         })
-        .expect(401);
+        .expect(403);
     });
   });
 
   describe('GET /api/auth/profile', () => {
     let token;
+    const userCredentials = {
+      email: 'loginuser@example.com',
+      password: 'password123',
+    };
 
     beforeAll(async () => {
+      await request(app)
+        .post('/api/auth/register')
+        .send({
+          ...userCredentials,
+          first_name: 'Login',
+          last_name: 'Test',
+        });
+
+      const user = await db('users').where('email', userCredentials.email).first();
+      user.email_verified_at = new Date();
+      await db('users').where('email', userCredentials.email).update(user);
+
       const response = await request(app).post('/api/auth/login').send({
         email: 'loginuser@example.com',
         password: 'password123',

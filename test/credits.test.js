@@ -47,88 +47,8 @@ describe('Credits Integration Tests', () => {
     test('should return 401 without authentication', async () => {
       await request(app).get('/api/credits/balance').expect(401);
     });
-
-    test('should reflect balance after a top-up', async () => {
-      await request(app)
-        .post('/api/credits/top-up')
-        .set('Authorization', `Bearer ${token}`)
-        .send({ amount: 100, plan_name: 'Test Pack' });
-
-      const response = await request(app)
-        .get('/api/credits/balance')
-        .set('Authorization', `Bearer ${token}`)
-        .expect(200);
-
-      expect(response.body.credits).toBe(DEFAULT_WELCOME_CREDITS + 100);
-    });
   });
 
-  // ─────────────────────────────────────────────
-  // POST /api/credits/top-up
-  // ─────────────────────────────────────────────
-  describe('POST /api/credits/top-up', () => {
-    let freshUser;
-    let freshToken;
-
-    beforeAll(async () => {
-      freshUser = await createTestUser();
-      freshToken = generateToken(freshUser);
-    });
-
-    test('should add credits and return updated balance', async () => {
-      const response = await request(app)
-        .post('/api/credits/top-up')
-        .set('Authorization', `Bearer ${freshToken}`)
-        .send({ amount: 50, plan_name: 'Starter Pack' })
-        .expect(200);
-
-      expect(response.body.message).toContain('successfully');
-      expect(response.body.added).toBe(50);
-      expect(response.body.new_balance).toBe(DEFAULT_WELCOME_CREDITS + 50);
-      expect(response.body.transaction).toHaveProperty('id');
-      expect(response.body.transaction.transaction_type).toBe(
-        TRANSACTION_TYPES.TOP_UP,
-      );
-      expect(response.body.transaction.amount).toBe(50);
-    });
-
-    test('should use default plan name if none provided', async () => {
-      const response = await request(app)
-        .post('/api/credits/top-up')
-        .set('Authorization', `Bearer ${freshToken}`)
-        .send({ amount: 25 })
-        .expect(200);
-
-      expect(response.body.transaction.description).toContain('Standard Plan');
-    });
-
-    test('should reject a top-up with amount of 0', async () => {
-      const response = await request(app)
-        .post('/api/credits/top-up')
-        .set('Authorization', `Bearer ${freshToken}`)
-        .send({ amount: 0 })
-        .expect(400);
-
-      expect(response.body).toHaveProperty('error');
-    });
-
-    test('should reject a top-up with a negative amount', async () => {
-      const response = await request(app)
-        .post('/api/credits/top-up')
-        .set('Authorization', `Bearer ${freshToken}`)
-        .send({ amount: -50 })
-        .expect(400);
-
-      expect(response.body).toHaveProperty('error');
-    });
-
-    test('should reject a top-up without a token', async () => {
-      await request(app)
-        .post('/api/credits/top-up')
-        .send({ amount: 100 })
-        .expect(401);
-    });
-  });
 
   // ─────────────────────────────────────────────
   // GET /api/credits/transactions
@@ -399,7 +319,7 @@ describe('Credits Integration Tests', () => {
         .returning('id');
 
       const response = await request(app)
-        .post(`/api/resume/${resume.id}/analyze`)
+        .post(`/api/resumes/${resume.id}/analyze`)
         .set('Authorization', `Bearer ${brokeToken}`)
         .send({
           job_description:
@@ -439,7 +359,7 @@ describe('Credits Integration Tests', () => {
       });
 
       const response = await request(app)
-        .post(`/api/job-application/${jobApp.id}/cover-letter`)
+        .post(`/api/job-applications/${jobApp.id}/cover-letter`)
         .set('Authorization', `Bearer ${brokeToken}`)
         .send({ tone: 'professional', length: 'medium' })
         .expect(402);

@@ -10,8 +10,7 @@ const {
   forgotPasswordSchema,
 } = require('../middleware/validation');
 const { authenticateToken } = require('../middleware/auth');
-const { default: EmailService } = require('../services/emailService');
-const { getRecentActivity } = require('../utils');
+const EmailService = require('../services/emailService');
 const { TRANSACTION_TYPES } = require('../config/constants');
 
 const router = express.Router();
@@ -64,7 +63,7 @@ router.post('/register', validate(registerSchema), async (req, res, next) => {
         'created_at',
       ]);
 
-    const emailService = new EmailService();
+    const emailService = EmailService;
 
     // Send verification email
     const emailResult = await emailService.sendVerificationEmail(
@@ -362,8 +361,8 @@ router.post(
       });
 
       // Send Email
-      const emailService = new EmailService();
-      const emailResponse = await emailService.sendPasswordResetEmail(
+      const emailService = EmailService;
+      await emailService.sendPasswordResetEmail(
         email,
         user.first_name,
         verificationToken,
@@ -513,7 +512,7 @@ router.post('/resend-verification', async (req, res, next) => {
       email_verification_token_expires_at: verificationTokenExpiry,
     });
 
-    const emailService = new EmailService();
+    const emailService = EmailService;
 
     // Send verification email
     const emailResult = await emailService.sendVerificationEmail(

@@ -1,7 +1,6 @@
 const express = require('express');
 const db = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
-const enums = require('../enums');
 const { getRecentActivity } = require('../utils');
 
 const router = express.Router();
@@ -18,7 +17,6 @@ router.get('/overview', authenticateToken, async (req, res, next) => {
     const [
       resumeCount,
       jobApplicationCount,
-      aiRequestStats,
       analyzedResumesData,
       totalAnalyzedCount,
       appsThisMonth,
@@ -27,10 +25,13 @@ router.get('/overview', authenticateToken, async (req, res, next) => {
     ] = await Promise.all([
       // Resume count
       db('resumes').where('user_id', userId).count('* as count').first(),
-      
+
       // Job application count
-      db('job_applications').where('user_id', userId).count('* as count').first(),
-      
+      db('job_applications')
+        .where('user_id', userId)
+        .count('* as count')
+        .first(),
+
       // AI request stats (last 30 days)
       db('ai_requests')
         .where('user_id', userId)
@@ -42,7 +43,12 @@ router.get('/overview', authenticateToken, async (req, res, next) => {
       // Get last 10 analyses for metrics aggregation
       db('resume_analysis')
         .where('user_id', userId)
-        .select('analysis_results', 'target_role', 'target_company', 'created_at')
+        .select(
+          'analysis_results',
+          'target_role',
+          'target_company',
+          'created_at',
+        )
         .orderBy('created_at', 'desc')
         .limit(10),
 
@@ -80,7 +86,7 @@ router.get('/overview', authenticateToken, async (req, res, next) => {
     const allWeaknesses = [];
     const recentAnalyses = [];
 
-    analyzedResumesData.forEach(results => {
+    analyzedResumesData.forEach((results) => {
       if (results && results.analysis_results) {
         const score = results.analysis_results.atsScore || 0;
         totalScore += score;
@@ -103,14 +109,15 @@ router.get('/overview', authenticateToken, async (req, res, next) => {
           target_role: results.target_role,
           target_company: results.target_company,
           score: score,
-          timestamp: results.created_at
+          timestamp: results.created_at,
         });
       }
     });
 
-    const avgScore = analyzedResumesData.length > 0 
-      ? Math.round(totalScore / analyzedResumesData.length) 
-      : 0;
+    const avgScore =
+      analyzedResumesData.length > 0
+        ? Math.round(totalScore / analyzedResumesData.length)
+        : 0;
 
     // Helper to get top frequencies
     const getTopItems = (arr, limit = 5) => {
@@ -141,17 +148,17 @@ router.get('/overview', authenticateToken, async (req, res, next) => {
         avg_score: avgScore,
         monthly_cost: parseFloat(monthlyCosts.total_cost) || 0,
         applications_this_month: parseInt(appsThisMonth.count),
-        ai_requests_this_month: parseInt(aiRequestsThisMonth.count)
+        ai_requests_this_month: parseInt(aiRequestsThisMonth.count),
       },
       resume_analytics: {
         score_distribution: scoreDistribution,
         top_strengths: getTopItems(allStrengths),
         top_weaknesses: getTopItems(allWeaknesses),
-        recent_analyses: recentAnalyses
+        recent_analyses: recentAnalyses,
       },
       recent_activity: activities,
       subscription_status: userData.subscription_type,
-      subscription_expires_at: userData.subscription_expires_at
+      subscription_expires_at: userData.subscription_expires_at,
     });
   } catch (error) {
     next(error);
@@ -167,13 +174,7 @@ router.get('/ai-usage', authenticateToken, async (req, res, next) => {
     const aiRequests = await db('ai_requests')
       .where('user_id', userId)
       .where('created_at', '>=', db.raw(`NOW() - INTERVAL '${period} days'`))
-      .select(
-        'request_type',
-        'status',
-        'tokens_used',
-        'cost',
-        'created_at'
-      )
+      .select('request_type', 'status', 'tokens_used', 'cost', 'created_at')
       .orderBy('created_at', 'desc');
 
     // Group by request type
@@ -183,17 +184,17 @@ router.get('/ai-usage', authenticateToken, async (req, res, next) => {
           total_requests: 0,
           successful_requests: 0,
           total_tokens: 0,
-          total_cost: 0
+          total_cost: 0,
         };
       }
-      
+
       acc[request.request_type].total_requests++;
       if (request.status === 'completed') {
         acc[request.request_type].successful_requests++;
         acc[request.request_type].total_tokens += request.tokens_used || 0;
         acc[request.request_type].total_cost += parseFloat(request.cost) || 0;
       }
-      
+
       return acc;
     }, {});
 
@@ -210,13 +211,16 @@ router.get('/ai-usage', authenticateToken, async (req, res, next) => {
     res.json({
       period_days: parseInt(period),
       usage_by_type: usageByType,
-      daily_usage: dailyUsage.map(day => ({
+      daily_usage: dailyUsage.map((day) => ({
         date: day.date,
         requests: parseInt(day.requests),
-        cost: parseFloat(day.cost) || 0
+        cost: parseFloat(day.cost) || 0,
       })),
       total_requests: aiRequests.length,
-      total_cost: aiRequests.reduce((sum, req) => sum + (parseFloat(req.cost) || 0), 0)
+      total_cost: aiRequests.reduce(
+        (sum, req) => sum + (parseFloat(req.cost) || 0),
+        0,
+      ),
     });
   } catch (error) {
     next(error);
@@ -234,14 +238,19 @@ router.get('/subscription', authenticateToken, async (req, res, next) => {
     if (!user) {
       return res.status(404).json({
         error: 'User not found',
-        code: 'USER_NOT_FOUND'
+        code: 'USER_NOT_FOUND',
       });
     }
 
     // Get usage for current billing period
-    const billingStart = user.subscription_type === 'free' 
-      ? user.created_at 
-      : (user.subscription_expires_at ? new Date(user.subscription_expires_at.getTime() - 30 * 24 * 60 * 60 * 1000) : user.created_at);
+    const billingStart =
+      user.subscription_type === 'free'
+        ? user.created_at
+        : user.subscription_expires_at
+          ? new Date(
+              user.subscription_expires_at.getTime() - 30 * 24 * 60 * 60 * 1000,
+            )
+          : user.created_at;
 
     const currentUsage = await db('ai_requests')
       .where('user_id', req.user.id)
@@ -256,31 +265,43 @@ router.get('/subscription', authenticateToken, async (req, res, next) => {
         max_resumes: 3,
         max_job_applications: 5,
         max_ai_requests_per_month: 10,
-        features: ['resume_upload', 'basic_analysis', 'cover_letter_generation']
+        features: [
+          'resume_upload',
+          'basic_analysis',
+          'cover_letter_generation',
+        ],
       },
       pro: {
         max_resumes: -1, // unlimited
         max_job_applications: -1, // unlimited
         max_ai_requests_per_month: -1, // unlimited
-        features: ['resume_upload', 'advanced_analysis', 'resume_optimization', 'cover_letter_generation', 'priority_support']
-      }
+        features: [
+          'resume_upload',
+          'advanced_analysis',
+          'resume_optimization',
+          'cover_letter_generation',
+          'priority_support',
+        ],
+      },
     };
 
-    const isSubscriptionActive = user.subscription_type === 'pro' && 
-      (!user.subscription_expires_at || new Date(user.subscription_expires_at) > new Date());
+    const isSubscriptionActive =
+      user.subscription_type === 'pro' &&
+      (!user.subscription_expires_at ||
+        new Date(user.subscription_expires_at) > new Date());
 
     res.json({
       subscription: {
         type: user.subscription_type,
         is_active: isSubscriptionActive,
         expires_at: user.subscription_expires_at,
-        limits: limits[user.subscription_type]
+        limits: limits[user.subscription_type],
       },
       usage: {
         total_requests: parseInt(currentUsage.total_requests) || 0,
         total_cost: parseFloat(currentUsage.total_cost) || 0,
-        period_start: billingStart
-      }
+        period_start: billingStart,
+      },
     });
   } catch (error) {
     next(error);
@@ -316,30 +337,31 @@ router.get('/activity', authenticateToken, async (req, res, next) => {
 
     // Combine and sort all activities
     const activities = [
-      ...recentResumes.map(resume => ({
+      ...recentResumes.map((resume) => ({
         type: 'resume_upload',
         id: resume.id,
         description: `Uploaded resume: ${resume.original_filename}`,
-        timestamp: resume.created_at
+        timestamp: resume.created_at,
       })),
-      ...recentJobApplications.map(app => ({
+      ...recentJobApplications.map((app) => ({
         type: 'job_application',
         id: app.id,
         description: `Applied to ${app.position_title} at ${app.company_name}`,
         status: app.status,
-        timestamp: app.created_at
+        timestamp: app.created_at,
       })),
-      ...recentAIRequests.map(req => ({
+      ...recentAIRequests.map((req) => ({
         type: 'ai_request',
         id: req.id,
         description: `AI ${req.request_type.replace('_', ' ')} ${req.status}`,
-        timestamp: req.created_at
-      }))
-    ].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
-     .slice(0, parseInt(limit));
+        timestamp: req.created_at,
+      })),
+    ]
+      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+      .slice(0, parseInt(limit));
 
     res.json({
-      activities
+      activities,
     });
   } catch (error) {
     next(error);

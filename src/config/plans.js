@@ -17,5 +17,5 @@ module.exports = {
     credits: 600,
     priceId: process.env.STRIPE_POWER_PRODUCT_ID,
     amount: 5000, // $50.00 in cents
-  }
+  },
 };

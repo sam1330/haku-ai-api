@@ -10,6 +10,19 @@ const {
 } = require('./helpers');
 const plans = require('../src/config/plans');
 
+jest.mock('stripe', () => {
+  return jest.fn(() => ({
+    webhooks: {
+      constructEvent: jest.fn(),
+    },
+    checkout: {
+      sessions: {
+        create: jest.fn(),
+      },
+    },
+  }));
+});
+
 // Mock Stripe Service
 jest.mock('../src/services/stripeService', () => {
   const original = jest.requireActual('../src/services/stripeService');

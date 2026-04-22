@@ -10,8 +10,18 @@ exports.up = function (knex) {
     table.text('job_description').nullable();
     table.jsonb('analysis_results').notNullable();
 
-    table.uuid('resume_id').references('id').inTable('resumes').onDelete('CASCADE').notNullable();
-    table.uuid('user_id').references('id').inTable('users').onDelete('CASCADE').notNullable();
+    table
+      .uuid('resume_id')
+      .references('id')
+      .inTable('resumes')
+      .onDelete('CASCADE')
+      .notNullable();
+    table
+      .uuid('user_id')
+      .references('id')
+      .inTable('users')
+      .onDelete('CASCADE')
+      .notNullable();
     table.timestamps(true, true);
 
     // Indexes

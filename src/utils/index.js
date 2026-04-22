@@ -1,7 +1,10 @@
-import db from '../config/database.js';
-import enums from '../enums/index.js';
+// import db from '../config/database.js';
+// import enums from '../enums/index.js';
 
-export const getRecentActivity = async (userId) => {
+const db = require('../config/database');
+const enums = require('../enums/index');
+
+const getRecentActivity = async (userId) => {
   // Get counts for different entities
   const [recentResumes, recentJobApplications, recentAIRequests] =
     await Promise.all([
@@ -66,4 +69,8 @@ export const getRecentActivity = async (userId) => {
     .slice(0, 10);
 
   return activities;
+};
+
+module.exports = {
+  getRecentActivity,
 };

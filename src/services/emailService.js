@@ -1,6 +1,7 @@
-import { Resend } from 'resend';
+// import { Resend } from 'resend';
+const { Resend } = require('resend');
 
-export default class EmailService {
+class EmailService {
   constructor() {
     this.transporter = null;
     this.initialized = false;
@@ -355,3 +356,5 @@ export default class EmailService {
     }
   }
 }
+
+module.exports = new EmailService();

@@ -1,121 +1,155 @@
 const express = require('express');
 const db = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
-const { validate, jobApplicationSchema, updateJobApplicationSchema, coverLetterSchema } = require('../middleware/validation');
+const {
+  validate,
+  jobApplicationSchema,
+  updateJobApplicationSchema,
+  coverLetterSchema,
+} = require('../middleware/validation');
 const aiService = require('../services/aiService');
 const { checkCredits } = require('../middleware/creditMiddleware');
 
 const router = express.Router();
 
 // Create job application
-router.post('/', authenticateToken, validate(jobApplicationSchema), async (req, res, next) => {
-  try {
-    const { company_name, position_title, job_description, application_url, application_deadline, notes, resume_id } = req.body;
+router.post(
+  '/',
+  authenticateToken,
+  validate(jobApplicationSchema),
+  async (req, res, next) => {
+    try {
+      const {
+        company_name,
+        position_title,
+        job_description,
+        application_url,
+        application_deadline,
+        notes,
+        resume_id,
+      } = req.body;
 
-    const [jobApplication] = await db('job_applications').insert({
-      user_id: req.user.id,
-      resume_id,
-      company_name,
-      position_title,
-      job_description,
-      application_url,
-      application_deadline: application_deadline ? new Date(application_deadline) : null,
-      notes,
-      status: 'draft'
-    }).returning(['id', 'company_name', 'position_title', 'status', 'created_at']);
+      const [jobApplication] = await db('job_applications')
+        .insert({
+          user_id: req.user.id,
+          resume_id,
+          company_name,
+          position_title,
+          job_description,
+          application_url,
+          application_deadline: application_deadline
+            ? new Date(application_deadline)
+            : null,
+          notes,
+          status: 'draft',
+        })
+        .returning([
+          'id',
+          'company_name',
+          'position_title',
+          'status',
+          'created_at',
+        ]);
 
-    res.status(201).json({
-      message: 'Job application created successfully',
-      job_application: jobApplication
-    });
-  } catch (error) {
-    next(error);
-  }
-});
+      res.status(201).json({
+        message: 'Job application created successfully',
+        job_application: jobApplication,
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
 
 // Generate cover letter for job application
-router.post('/:id/cover-letter', authenticateToken, checkCredits('COVER_LETTER_GENERATION'), validate(coverLetterSchema), async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const { tone, length } = req.body;
-    const locale = req.headers["x-locale"] || "en";
+router.post(
+  '/:id/cover-letter',
+  authenticateToken,
+  checkCredits('COVER_LETTER_GENERATION'),
+  validate(coverLetterSchema),
+  async (req, res, next) => {
+    try {
+      const { id } = req.params;
+      const { tone, length } = req.body;
+      const locale = req.headers['x-locale'] || 'en';
 
-    // Get job application
-    const jobApplication = await db('job_applications')
-      .where('id', id)
-      .where('user_id', req.user.id)
-      .first();
+      // Get job application
+      const jobApplication = await db('job_applications')
+        .where('id', id)
+        .where('user_id', req.user.id)
+        .first();
 
-    if (!jobApplication) {
-      return res.status(404).json({
-        error: 'Job application not found',
-        code: 'JOB_APPLICATION_NOT_FOUND'
-      });
-    }
+      if (!jobApplication) {
+        return res.status(404).json({
+          error: 'Job application not found',
+          code: 'JOB_APPLICATION_NOT_FOUND',
+        });
+      }
 
-    // Get user's most recent resume
-    const resume = await db('resumes')
-      .where('user_id', req.user.id)
-      .where('id', jobApplication.resume_id)
-      .first();
+      // Get user's most recent resume
+      const resume = await db('resumes')
+        .where('user_id', req.user.id)
+        .where('id', jobApplication.resume_id)
+        .first();
 
-    if (!resume || !resume.extracted_text) {
-      return res.status(400).json({
-        error: 'No resume available for cover letter generation',
-        code: 'NO_RESUME_AVAILABLE'
-      });
-    }
+      if (!resume || !resume.extracted_text) {
+        return res.status(400).json({
+          error: 'No resume available for cover letter generation',
+          code: 'NO_RESUME_AVAILABLE',
+        });
+      }
 
-    // Generate cover letter
-    const coverLetterResult = await aiService.generateCoverLetter(
-      resume.extracted_text,
-      jobApplication.job_description,
-      jobApplication.company_name,
-      jobApplication.position_title,
-      req.user.id,
-      tone,
-      length,
-      locale
-    );
+      // Generate cover letter
+      const coverLetterResult = await aiService.generateCoverLetter(
+        resume.extracted_text,
+        jobApplication.job_description,
+        jobApplication.company_name,
+        jobApplication.position_title,
+        req.user.id,
+        tone,
+        length,
+        locale,
+      );
 
-    // Update job application with cover letter data
-    await db('job_applications')
-      .where('id', id)
-      .update({
-        cover_letter_data: {
-          content: coverLetterResult.coverLetter,
+      // Update job application with cover letter data
+      await db('job_applications')
+        .where('id', id)
+        .update({
+          cover_letter_data: {
+            content: coverLetterResult.coverLetter,
+            tone,
+            length,
+            generated_at: new Date(),
+            tokens_used: coverLetterResult.tokensUsed,
+            cost: coverLetterResult.cost,
+          },
+        });
+
+      // Log AI request
+      await aiService.logAIRequest(
+        req.user.id,
+        'cover_letter_generation',
+        {
+          job_application_id: id,
+          company_name: jobApplication.company_name,
+          position_title: jobApplication.position_title,
           tone,
           length,
-          generated_at: new Date(),
-          tokens_used: coverLetterResult.tokensUsed,
-          cost: coverLetterResult.cost
-        }
+        },
+        { cover_letter: coverLetterResult.coverLetter },
+        coverLetterResult.tokensUsed,
+        coverLetterResult.cost,
+      );
+
+      res.json({
+        message: 'Cover letter generated successfully',
+        cover_letter: coverLetterResult.coverLetter,
       });
-
-    // Log AI request
-    await aiService.logAIRequest(
-      req.user.id,
-      'cover_letter_generation',
-      {
-        job_application_id: id,
-        company_name: jobApplication.company_name,
-        position_title: jobApplication.position_title,
-        tone,
-        length
-      },
-      { cover_letter: coverLetterResult.coverLetter },
-      coverLetterResult.tokensUsed,
-      coverLetterResult.cost
-    );
-
-    res.json({
-      message: 'Cover letter generated successfully',
-      cover_letter: coverLetterResult.coverLetter
-    });
-  } catch (error) {
-    next(error);
-  }
-});
+    } catch (error) {
+      next(error);
+    }
+  },
+);
 
 // Get all job applications
 router.get('/', authenticateToken, async (req, res, next) => {
@@ -125,7 +159,16 @@ router.get('/', authenticateToken, async (req, res, next) => {
 
     let query = db('job_applications')
       .where('user_id', req.user.id)
-      .select('id', 'company_name', 'position_title', 'status', 'application_url', 'application_deadline', 'created_at', 'updated_at');
+      .select(
+        'id',
+        'company_name',
+        'position_title',
+        'status',
+        'application_url',
+        'application_deadline',
+        'created_at',
+        'updated_at',
+      );
 
     if (status) {
       query = query.where('status', status);
@@ -148,8 +191,8 @@ router.get('/', authenticateToken, async (req, res, next) => {
         page: parseInt(page),
         limit: parseInt(limit),
         total: parseInt(total.count),
-        pages: Math.ceil(total.count / limit)
-      }
+        pages: Math.ceil(total.count / limit),
+      },
     });
   } catch (error) {
     next(error);
@@ -169,7 +212,7 @@ router.get('/:id', authenticateToken, async (req, res, next) => {
     if (!jobApplication) {
       return res.status(404).json({
         error: 'Job application not found',
-        code: 'JOB_APPLICATION_NOT_FOUND'
+        code: 'JOB_APPLICATION_NOT_FOUND',
       });
     }
 
@@ -177,9 +220,13 @@ router.get('/:id', authenticateToken, async (req, res, next) => {
       job_application: {
         ...jobApplication,
         cover_letter_data: {
-          content: jobApplication.cover_letter_data ? jobApplication.cover_letter_data.content : null,
-          generated_at: jobApplication.cover_letter_data ? jobApplication.cover_letter_data.generated_at : null
-        }
+          content: jobApplication.cover_letter_data
+            ? jobApplication.cover_letter_data.content
+            : null,
+          generated_at: jobApplication.cover_letter_data
+            ? jobApplication.cover_letter_data.generated_at
+            : null,
+        },
       },
     });
   } catch (error) {
@@ -188,51 +235,62 @@ router.get('/:id', authenticateToken, async (req, res, next) => {
 });
 
 // Update job application
-router.put('/:id', authenticateToken, validate(updateJobApplicationSchema), async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const updates = req.body;
+router.put(
+  '/:id',
+  authenticateToken,
+  validate(updateJobApplicationSchema),
+  async (req, res, next) => {
+    try {
+      const { id } = req.params;
+      const updates = req.body;
 
-    // Remove undefined values
-    Object.keys(updates).forEach(key => {
-      if (updates[key] === undefined) {
-        delete updates[key];
+      // Remove undefined values
+      Object.keys(updates).forEach((key) => {
+        if (updates[key] === undefined) {
+          delete updates[key];
+        }
+      });
+
+      if (Object.keys(updates).length === 0) {
+        return res.status(400).json({
+          error: 'No valid fields to update',
+          code: 'NO_UPDATES',
+        });
       }
-    });
 
-    if (Object.keys(updates).length === 0) {
-      return res.status(400).json({
-        error: 'No valid fields to update',
-        code: 'NO_UPDATES'
+      // Handle date conversion for application_deadline
+      if (updates.application_deadline) {
+        updates.application_deadline = new Date(updates.application_deadline);
+      }
+
+      const [updatedJobApplication] = await db('job_applications')
+        .where('id', id)
+        .where('user_id', req.user.id)
+        .update(updates)
+        .returning([
+          'id',
+          'company_name',
+          'position_title',
+          'status',
+          'updated_at',
+        ]);
+
+      if (!updatedJobApplication) {
+        return res.status(404).json({
+          error: 'Job application not found',
+          code: 'JOB_APPLICATION_NOT_FOUND',
+        });
+      }
+
+      res.json({
+        message: 'Job application updated successfully',
+        job_application: updatedJobApplication,
       });
+    } catch (error) {
+      next(error);
     }
-
-    // Handle date conversion for application_deadline
-    if (updates.application_deadline) {
-      updates.application_deadline = new Date(updates.application_deadline);
-    }
-
-    const [updatedJobApplication] = await db('job_applications')
-      .where('id', id)
-      .where('user_id', req.user.id)
-      .update(updates)
-      .returning(['id', 'company_name', 'position_title', 'status', 'updated_at']);
-
-    if (!updatedJobApplication) {
-      return res.status(404).json({
-        error: 'Job application not found',
-        code: 'JOB_APPLICATION_NOT_FOUND'
-      });
-    }
-
-    res.json({
-      message: 'Job application updated successfully',
-      job_application: updatedJobApplication
-    });
-  } catch (error) {
-    next(error);
-  }
-});
+  },
+);
 
 // Delete job application
 router.delete('/:id', authenticateToken, async (req, res, next) => {
@@ -247,12 +305,12 @@ router.delete('/:id', authenticateToken, async (req, res, next) => {
     if (deleted === 0) {
       return res.status(404).json({
         error: 'Job application not found',
-        code: 'JOB_APPLICATION_NOT_FOUND'
+        code: 'JOB_APPLICATION_NOT_FOUND',
       });
     }
 
     res.json({
-      message: 'Job application deleted successfully'
+      message: 'Job application deleted successfully',
     });
   } catch (error) {
     next(error);
@@ -273,14 +331,14 @@ router.get('/:id/cover-letter', authenticateToken, async (req, res, next) => {
     if (!jobApplication) {
       return res.status(404).json({
         error: 'Job application not found',
-        code: 'JOB_APPLICATION_NOT_FOUND'
+        code: 'JOB_APPLICATION_NOT_FOUND',
       });
     }
 
     if (!jobApplication.cover_letter_data) {
       return res.status(404).json({
         error: 'Cover letter not generated for this application',
-        code: 'NO_COVER_LETTER'
+        code: 'NO_COVER_LETTER',
       });
     }
 
@@ -291,8 +349,8 @@ router.get('/:id/cover-letter', authenticateToken, async (req, res, next) => {
         length: jobApplication.cover_letter_data.length,
         generated_at: jobApplication.cover_letter_data.generated_at,
         tokens_used: jobApplication.cover_letter_data.tokens_used,
-        cost: jobApplication.cover_letter_data.cost
-      }
+        cost: jobApplication.cover_letter_data.cost,
+      },
     });
   } catch (error) {
     next(error);

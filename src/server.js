@@ -1,13 +1,11 @@
 require('dotenv').config();
 
-const Sentry = require("@sentry/node");
-const { nodeProfilingIntegration } = require("@sentry/profiling-node");
+const Sentry = require('@sentry/node');
+const { nodeProfilingIntegration } = require('@sentry/profiling-node');
 
 Sentry.init({
   dsn: process.env.SENTRY_DSN,
-  integrations: [
-    nodeProfilingIntegration(),
-  ],
+  integrations: [nodeProfilingIntegration()],
   // Tracing
   tracesSampleRate: 1.0, //  Capture 100% of the transactions
   // Set sampling rate for profiling
@@ -36,40 +34,48 @@ const HOST = process.env.API_HOST || 'localhost';
 
 // Security middleware
 app.use(helmet());
-app.use(compression({
-  filter: (req, res) => {
-    // Don't compress PDF responses
-    if (res.getHeader("Content-Type") === "application/pdf") {
-      return false;
-    }
-    // Use default compression for everything else
-    return compression.filter(req, res);
-  }
-}));
+app.use(
+  compression({
+    filter: (req, res) => {
+      // Don't compress PDF responses
+      if (res.getHeader('Content-Type') === 'application/pdf') {
+        return false;
+      }
+      // Use default compression for everything else
+      return compression.filter(req, res);
+    },
+  }),
+);
 
 // Rate limiting
 const limiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
   max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100, // limit each IP to 100 requests per windowMs
-  identifier: function (req, res) { return req.user ? req.user.id : req.ip; },
-  message: 'Too many requests from this IP, please try again later.'
+  identifier: function (req) {
+    return req.user ? req.user.id : req.ip;
+  },
+  message: 'Too many requests from this IP, please try again later.',
 });
 app.use(limiter);
 
 // CORS configuration
-app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:3001',
-  credentials: true
-}));
+app.use(
+  cors({
+    origin: process.env.CORS_ORIGIN || 'http://localhost:3001',
+    credentials: true,
+  }),
+);
 
-app.use(express.json({
-  verify: (req, res, buf) => {
-    // If the URL is our webhook, attach the raw buffer to the request
-    if (req.originalUrl.startsWith('/api/credits/webhook')) {
-      req.rawBody = buf;
-    }
-  }
-}));
+app.use(
+  express.json({
+    verify: (req, res, buf) => {
+      // If the URL is our webhook, attach the raw buffer to the request
+      if (req.originalUrl.startsWith('/api/credits/webhook')) {
+        req.rawBody = buf;
+      }
+    },
+  }),
+);
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
@@ -83,7 +89,7 @@ app.get('/health', (req, res) => {
   res.status(200).json({
     status: 'OK',
     timestamp: new Date().toISOString(),
-    uptime: process.uptime()
+    uptime: process.uptime(),
   });
 });
 

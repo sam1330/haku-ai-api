@@ -10,7 +10,7 @@ const checkDatabaseConnection = async (req, res, next) => {
     return res.status(503).json({
       error: 'Database connection failed',
       code: 'DATABASE_ERROR',
-      message: 'Please check your database connection and try again'
+      message: 'Please check your database connection and try again',
     });
   }
 };

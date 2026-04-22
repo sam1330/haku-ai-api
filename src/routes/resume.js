@@ -1,15 +1,12 @@
 const express = require('express');
 const db = require('../config/database');
-const {
-  authenticateToken,
-  requireSubscription,
-} = require('../middleware/auth');
+const { authenticateToken } = require('../middleware/auth');
 const {
   validate,
   resumeAnalysisSchema,
   resumeSchema,
 } = require('../middleware/validation');
-const { fileService } = require('../services/fileService');
+const fileService = require('../services/fileService');
 const aiService = require('../services/aiService');
 const { checkCredits } = require('../middleware/creditMiddleware');
 const enums = require('../enums');
@@ -31,7 +28,7 @@ router.post(
         });
       }
 
-      const { originalname, filename, mimetype, size } = req.file;
+      const { originalname, mimetype, size } = req.file;
       const fileType = fileService.getFileTypeFromMimeType(mimetype);
 
       // Save file to S3
@@ -138,7 +135,7 @@ router.post(
       );
 
       // Save analysis results to the new table
-      const [analysis] = await db('resume_analysis')
+      await db('resume_analysis')
         .insert({
           resume_id: resume_id,
           user_id: req.user.id,

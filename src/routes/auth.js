@@ -27,79 +27,82 @@ router.post(
   validate(registerSchema),
   validateRecaptcha,
   async (req, res, next) => {
-  try {
-    const { email, password, first_name, last_name } = req.body;
-    const locale = req.headers['x-locale'] || 'en';
+    try {
+      const { email, password, first_name, last_name } = req.body;
+      const locale = req.headers['x-locale'] || 'en';
 
-    // Check if user already exists
-    const existingUser = await db('users').where('email', email).first();
-    if (existingUser) {
-      return res.status(409).json({
-        error: 'User already exists with this email',
-        code: 'USER_EXISTS',
-      });
-    }
+      // Check if user already exists
+      const existingUser = await db('users').where('email', email).first();
+      if (existingUser) {
+        return res.status(409).json({
+          error: 'User already exists with this email',
+          code: 'USER_EXISTS',
+        });
+      }
 
-    // Hash password
-    const saltRounds = 12;
-    const passwordHash = await bcrypt.hash(password, saltRounds);
+      // Hash password
+      const saltRounds = 12;
+      const passwordHash = await bcrypt.hash(password, saltRounds);
 
-    // Generate verification token
-    const verificationToken = generateVerificationToken();
-    const verificationTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+      // Generate verification token
+      const verificationToken = generateVerificationToken();
+      const verificationTokenExpiry = new Date(
+        Date.now() + 24 * 60 * 60 * 1000,
+      ); // 24 hours
 
-    // Create user
-    const [user] = await db('users')
-      .insert({
+      // Create user
+      const [user] = await db('users')
+        .insert({
+          email,
+          password_hash: passwordHash,
+          first_name,
+          last_name,
+          subscription_type: 'candidate',
+          email_verification_token: verificationToken,
+          email_verification_token_expires_at: verificationTokenExpiry,
+        })
+        .returning([
+          'id',
+          'email',
+          'first_name',
+          'last_name',
+          'subscription_type',
+          'created_at',
+        ]);
+
+      const emailService = EmailService;
+
+      // Send verification email
+      const emailResult = await emailService.sendVerificationEmail(
         email,
-        password_hash: passwordHash,
         first_name,
-        last_name,
-        subscription_type: 'candidate',
-        email_verification_token: verificationToken,
-        email_verification_token_expires_at: verificationTokenExpiry,
-      })
-      .returning([
-        'id',
-        'email',
-        'first_name',
-        'last_name',
-        'subscription_type',
-        'created_at',
-      ]);
+        verificationToken,
+        locale,
+      );
 
-    const emailService = EmailService;
+      if (!emailResult.success) {
+        console.error('Failed to send verification email:', emailResult.error);
+        // Still register the user even if email fails
+      }
 
-    // Send verification email
-    const emailResult = await emailService.sendVerificationEmail(
-      email,
-      first_name,
-      verificationToken,
-      locale,
-    );
-
-    if (!emailResult.success) {
-      console.error('Failed to send verification email:', emailResult.error);
-      // Still register the user even if email fails
+      res.status(201).json({
+        message:
+          'User registered successfully. Please check your email to verify your account.',
+        user: {
+          id: user.id,
+          email: user.email,
+          first_name: user.first_name,
+          last_name: user.last_name,
+          subscription_type: user.subscription_type,
+          email_verified: false,
+        },
+        token: null, // No token until email is verified
+      });
+    } catch (error) {
+      next(error);
     }
-
-    res.status(201).json({
-      message:
-        'User registered successfully. Please check your email to verify your account.',
-      user: {
-        id: user.id,
-        email: user.email,
-        first_name: user.first_name,
-        last_name: user.last_name,
-        subscription_type: user.subscription_type,
-        email_verified: false,
-      },
-      token: null, // No token until email is verified
-    });
-  } catch (error) {
-    next(error);
-  }
-});
+  },
+);
 
 // Login
 router.post(
@@ -107,73 +110,77 @@ router.post(
   validate(loginSchema),
   validateRecaptcha,
   async (req, res, next) => {
-  try {
-    const { email, password } = req.body;
+    try {
+      const { email, password } = req.body;
 
-    // Find user
-    const user = await db('users').where('email', email).first();
-    if (!user) {
-      return res.status(403).json({
-        error: 'Invalid email or password',
-        code: 'INVALID_CREDENTIALS',
+      // Find user
+      const user = await db('users').where('email', email).first();
+      if (!user) {
+        return res.status(403).json({
+          error: 'Invalid email or password',
+          code: 'INVALID_CREDENTIALS',
+        });
+      }
+
+      // Check if account is active
+      if (!user.is_active) {
+        return res.status(403).json({
+          error: 'Account is deactivated',
+          code: 'ACCOUNT_DEACTIVATED',
+        });
+      }
+
+      // Check if email is verified
+      if (!user.email_verified_at) {
+        return res.status(403).json({
+          error: 'Please verify your email before logging in',
+          code: 'EMAIL_NOT_VERIFIED',
+          email: user.email,
+        });
+      }
+
+      // Verify password
+      const isValidPassword = await bcrypt.compare(
+        password,
+        user.password_hash,
+      );
+      if (!isValidPassword) {
+        return res.status(403).json({
+          error: 'Invalid email or password',
+          code: 'INVALID_CREDENTIALS',
+        });
+      }
+
+      // Update last login
+      await db('users')
+        .where('id', user.id)
+        .update({ last_login_at: new Date() });
+
+      // Generate JWT token
+      const token = jwt.sign(
+        { userId: user.id, email: user.email },
+        process.env.JWT_SECRET,
+        { expiresIn: process.env.JWT_EXPIRES_IN || '7d' },
+      );
+
+      res.json({
+        message: 'Login successful',
+        user: {
+          id: user.id,
+          email: user.email,
+          first_name: user.first_name,
+          last_name: user.last_name,
+          subscription_type: user.subscription_type,
+          subscription_expires_at: user.subscription_expires_at,
+          email_verified: true,
+        },
+        token,
       });
+    } catch (error) {
+      next(error);
     }
-
-    // Check if account is active
-    if (!user.is_active) {
-      return res.status(403).json({
-        error: 'Account is deactivated',
-        code: 'ACCOUNT_DEACTIVATED',
-      });
-    }
-
-    // Check if email is verified
-    if (!user.email_verified_at) {
-      return res.status(403).json({
-        error: 'Please verify your email before logging in',
-        code: 'EMAIL_NOT_VERIFIED',
-        email: user.email,
-      });
-    }
-
-    // Verify password
-    const isValidPassword = await bcrypt.compare(password, user.password_hash);
-    if (!isValidPassword) {
-      return res.status(403).json({
-        error: 'Invalid email or password',
-        code: 'INVALID_CREDENTIALS',
-      });
-    }
-
-    // Update last login
-    await db('users')
-      .where('id', user.id)
-      .update({ last_login_at: new Date() });
-
-    // Generate JWT token
-    const token = jwt.sign(
-      { userId: user.id, email: user.email },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' },
-    );
-
-    res.json({
-      message: 'Login successful',
-      user: {
-        id: user.id,
-        email: user.email,
-        first_name: user.first_name,
-        last_name: user.last_name,
-        subscription_type: user.subscription_type,
-        subscription_expires_at: user.subscription_expires_at,
-        email_verified: true,
-      },
-      token,
-    });
-  } catch (error) {
-    next(error);
-  }
-});
+  },
+);
 
 // Get current user profile
 router.get('/profile', authenticateToken, async (req, res, next) => {

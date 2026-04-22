@@ -20,8 +20,10 @@ const validateRecaptcha = async (req, res, next) => {
   const minScore = parseFloat(process.env.RECAPTCHA_MIN_SCORE) || 0.5;
 
   if (!secretKey) {
-    console.error('RECAPTCHA_SECRET_KEY is not defined in environment variables');
-    // In development, we might want to skip this if not configured, 
+    console.error(
+      'RECAPTCHA_SECRET_KEY is not defined in environment variables',
+    );
+    // In development, we might want to skip this if not configured,
     // but in production it's a critical error.
     if (process.env.NODE_ENV === 'production') {
       return res.status(500).json({

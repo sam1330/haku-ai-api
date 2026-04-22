@@ -1,7 +1,13 @@
 process.env.NODE_ENV = 'test';
 const request = require('supertest');
 const app = require('../src/server');
-const { cleanDatabase, createTestUser, generateToken, db, runMigrations } = require('./helpers');
+const {
+  cleanDatabase,
+  createTestUser,
+  generateToken,
+  db,
+  runMigrations,
+} = require('./helpers');
 
 describe('Job Application Integration Tests', () => {
   let user;
@@ -13,17 +19,19 @@ describe('Job Application Integration Tests', () => {
     await cleanDatabase();
     user = await createTestUser();
     token = generateToken(user);
-    
+
     // Create a mock resume for job application tests
-    const [resume] = await db('resumes').insert({
-      user_id: user.id,
-      original_filename: 'test-resume.pdf',
-      file_path: 'uploads/test-path.pdf',
-      file_type: 'pdf',
-      file_size: 1024,
-      extracted_text: 'Sample resume text for testing purposes.',
-      is_processed: true
-    }).returning('id');
+    const [resume] = await db('resumes')
+      .insert({
+        user_id: user.id,
+        original_filename: 'test-resume.pdf',
+        file_path: 'uploads/test-path.pdf',
+        file_type: 'pdf',
+        file_size: 1024,
+        extracted_text: 'Sample resume text for testing purposes.',
+        is_processed: true,
+      })
+      .returning('id');
     resumeId = resume.id;
   });
 
@@ -35,10 +43,11 @@ describe('Job Application Integration Tests', () => {
     const validApplication = {
       company_name: 'Tech Corp',
       position_title: 'Software Engineer',
-      job_description: 'Building amazing things with AI. This description is now longer than 50 characters to pass validation requirements.',
+      job_description:
+        'Building amazing things with AI. This description is now longer than 50 characters to pass validation requirements.',
       application_url: 'https://example.com/apply',
       notes: 'Referral from Jane',
-      resume_id: null // Will be set in the test
+      resume_id: null, // Will be set in the test
     };
 
     test('should create a job application successfully', async () => {
@@ -51,7 +60,7 @@ describe('Job Application Integration Tests', () => {
       expect(response.body.job_application).toMatchObject({
         company_name: validApplication.company_name,
         position_title: validApplication.position_title,
-        status: 'draft'
+        status: 'draft',
       });
       expect(response.body.job_application).toHaveProperty('id');
     });
@@ -82,14 +91,17 @@ describe('Job Application Integration Tests', () => {
     let jobId;
 
     beforeAll(async () => {
-      const [job] = await db('job_applications').insert({
-        user_id: user.id,
-        resume_id: resumeId,
-        company_name: 'Detail Corp',
-        position_title: 'Analyst',
-        job_description: 'This is a detailed job description that meets the 50 character minimum requirement for validation.',
-        status: 'draft'
-      }).returning('id');
+      const [job] = await db('job_applications')
+        .insert({
+          user_id: user.id,
+          resume_id: resumeId,
+          company_name: 'Detail Corp',
+          position_title: 'Analyst',
+          job_description:
+            'This is a detailed job description that meets the 50 character minimum requirement for validation.',
+          status: 'draft',
+        })
+        .returning('id');
       jobId = typeof job === 'object' ? job.id : job;
     });
 
@@ -115,14 +127,17 @@ describe('Job Application Integration Tests', () => {
     let jobId;
 
     beforeAll(async () => {
-      const [job] = await db('job_applications').insert({
-        user_id: user.id,
-        resume_id: resumeId,
-        company_name: 'Update Corp',
-        position_title: 'Junior Dev',
-        job_description: 'Another long job description for updating tests that satisfies the minimum length constraint.',
-        status: 'draft'
-      }).returning('id');
+      const [job] = await db('job_applications')
+        .insert({
+          user_id: user.id,
+          resume_id: resumeId,
+          company_name: 'Update Corp',
+          position_title: 'Junior Dev',
+          job_description:
+            'Another long job description for updating tests that satisfies the minimum length constraint.',
+          status: 'draft',
+        })
+        .returning('id');
       jobId = typeof job === 'object' ? job.id : job;
     });
 
@@ -151,14 +166,17 @@ describe('Job Application Integration Tests', () => {
     let jobId;
 
     beforeEach(async () => {
-      const [job] = await db('job_applications').insert({
-        user_id: user.id,
-        resume_id: resumeId,
-        company_name: 'Delete Corp',
-        position_title: 'Temp',
-        job_description: 'Temporary job description for deletion tests that is long enough to pass any validation if needed.',
-        status: 'draft'
-      }).returning('id');
+      const [job] = await db('job_applications')
+        .insert({
+          user_id: user.id,
+          resume_id: resumeId,
+          company_name: 'Delete Corp',
+          position_title: 'Temp',
+          job_description:
+            'Temporary job description for deletion tests that is long enough to pass any validation if needed.',
+          status: 'draft',
+        })
+        .returning('id');
       jobId = typeof job === 'object' ? job.id : job;
     });
 

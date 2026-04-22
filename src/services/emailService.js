@@ -29,20 +29,30 @@ export default class EmailService {
       from: `"${this.fromName}" <${this.fromEmail}>`,
       to: [email],
       subject: 'Verify Your Email - Haku AI Resume Assistant',
-      html: this._getVerificationEmailTemplate(firstName, verificationUrl, locale),
+      html: this._getVerificationEmailTemplate(
+        firstName,
+        verificationUrl,
+        locale,
+      ),
     };
 
     try {
       const { data, error } = await this.transporter.emails.send(mailOptions);
 
       if (error) {
-        console.error(`Failed to send verification email to ${email}:`, error.message);
+        console.error(
+          `Failed to send verification email to ${email}:`,
+          error.message,
+        );
         return { success: false, error: error.message };
       }
       console.log(`Verification email sent to ${email}: ${data.id}`);
       return { success: true, messageId: data.id };
     } catch (error) {
-      console.error(`Failed to send verification email to ${email}:`, error.message);
+      console.error(
+        `Failed to send verification email to ${email}:`,
+        error.message,
+      );
       return { success: false, error: error.message };
     }
   }
@@ -65,14 +75,20 @@ export default class EmailService {
       const { data, error } = await this.transporter.emails.send(mailOptions);
 
       if (error) {
-        console.error(`Failed to send password reset email to ${email}:`, error.message);
+        console.error(
+          `Failed to send password reset email to ${email}:`,
+          error.message,
+        );
         return { success: false, error: error.message };
       }
 
       console.log(`Password reset email sent to ${email}: ${data.id}`);
       return { success: true, messageId: data.id };
     } catch (error) {
-      console.error(`Failed to send password reset email to ${email}:`, error.message);
+      console.error(
+        `Failed to send password reset email to ${email}:`,
+        error.message,
+      );
       return { success: false, error: error.message };
     }
   }

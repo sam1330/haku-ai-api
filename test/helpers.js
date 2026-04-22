@@ -14,7 +14,7 @@ const cleanDatabase = async () => {
     'resume_analysis',
     'job_applications',
     'resumes',
-    'users'
+    'users',
   ];
 
   for (const table of tables) {
@@ -41,7 +41,7 @@ const generateToken = (user) => {
   return jwt.sign(
     { userId: user.id, email: user.email },
     process.env.JWT_SECRET || 'test_secret',
-    { expiresIn: '1h' }
+    { expiresIn: '1h' },
   );
 };
 
@@ -51,15 +51,16 @@ const generateToken = (user) => {
 const createTestUser = async (overrides = {}) => {
   const defaultUser = {
     email: `test_${Date.now()}@example.com`,
-    password_hash: '$2a$12$LQv3c1yqBWVHxkd0LqCF7uQyxLp/X/8.f.f.f.f.f.f.f.f.f.f.f', // "password123"
+    password_hash:
+      '$2a$12$LQv3c1yqBWVHxkd0LqCF7uQyxLp/X/8.f.f.f.f.f.f.f.f.f.f.f', // "password123"
     first_name: 'Test',
     last_name: 'User',
     subscription_type: 'free',
-    is_active: true
+    is_active: true,
   };
 
   const user = { ...defaultUser, ...overrides };
-  
+
   const [createdUser] = await db('users')
     .insert(user)
     .returning(['id', 'email', 'first_name', 'last_name', 'subscription_type']);
@@ -72,5 +73,5 @@ module.exports = {
   runMigrations,
   generateToken,
   createTestUser,
-  db
+  db,
 };

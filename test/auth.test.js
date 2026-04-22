@@ -1,7 +1,13 @@
 process.env.NODE_ENV = 'test';
 const request = require('supertest');
 const app = require('../src/server');
-const { cleanDatabase, createTestUser, generateToken, db, runMigrations } = require('./helpers');
+const {
+  cleanDatabase,
+  createTestUser,
+  generateToken,
+  db,
+  runMigrations,
+} = require('./helpers');
 
 describe('Authentication Integration Tests', () => {
   beforeAll(async () => {
@@ -18,7 +24,7 @@ describe('Authentication Integration Tests', () => {
       email: 'newuser@example.com',
       password: 'password123',
       first_name: 'John',
-      last_name: 'Doe'
+      last_name: 'Doe',
     };
 
     test('should register a new user successfully', async () => {
@@ -31,16 +37,13 @@ describe('Authentication Integration Tests', () => {
       expect(response.body.user).toMatchObject({
         email: newUser.email,
         first_name: newUser.first_name,
-        last_name: newUser.last_name
+        last_name: newUser.last_name,
       });
       expect(response.body.user).not.toHaveProperty('password_hash');
     });
 
     test('should fail with duplicate email', async () => {
-      await request(app)
-        .post('/api/auth/register')
-        .send(newUser)
-        .expect(409);
+      await request(app).post('/api/auth/register').send(newUser).expect(409);
     });
 
     test('should fail with invalid email', async () => {
@@ -55,7 +58,7 @@ describe('Authentication Integration Tests', () => {
   describe('POST /api/auth/login', () => {
     const userCredentials = {
       email: 'loginuser@example.com',
-      password: 'password123'
+      password: 'password123',
     };
 
     beforeAll(async () => {
@@ -65,7 +68,7 @@ describe('Authentication Integration Tests', () => {
         .send({
           ...userCredentials,
           first_name: 'Login',
-          last_name: 'Test'
+          last_name: 'Test',
         });
     });
 
@@ -84,7 +87,7 @@ describe('Authentication Integration Tests', () => {
         .post('/api/auth/login')
         .send({
           email: userCredentials.email,
-          password: 'wrongpassword'
+          password: 'wrongpassword',
         })
         .expect(401);
     });
@@ -94,12 +97,10 @@ describe('Authentication Integration Tests', () => {
     let token;
 
     beforeAll(async () => {
-      const response = await request(app)
-        .post('/api/auth/login')
-        .send({
-          email: 'loginuser@example.com',
-          password: 'password123'
-        });
+      const response = await request(app).post('/api/auth/login').send({
+        email: 'loginuser@example.com',
+        password: 'password123',
+      });
       token = response.body.token;
     });
 
@@ -113,9 +114,7 @@ describe('Authentication Integration Tests', () => {
     });
 
     test('should fail without token', async () => {
-      await request(app)
-        .get('/api/auth/profile')
-        .expect(401);
+      await request(app).get('/api/auth/profile').expect(401);
     });
   });
 });

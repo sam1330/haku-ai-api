@@ -18,15 +18,18 @@ const registerSchema = Joi.object({
   password: Joi.string().min(8).required(),
   first_name: Joi.string().min(2).max(50).required(),
   last_name: Joi.string().min(2).max(50).required(),
+  recaptcha_token: Joi.string().required(),
 });
 
 const loginSchema = Joi.object({
   email: Joi.string().email().required(),
   password: Joi.string().required(),
+  recaptcha_token: Joi.string().required(),
 });
 
 const forgotPasswordSchema = Joi.object({
   email: Joi.string().email().required(),
+  recaptcha_token: Joi.string().required(),
 });
 
 // Resume validation schemas

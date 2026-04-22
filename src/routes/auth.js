@@ -10,6 +10,7 @@ const {
   forgotPasswordSchema,
 } = require('../middleware/validation');
 const { authenticateToken } = require('../middleware/auth');
+const { validateRecaptcha } = require('../middleware/recaptcha');
 const EmailService = require('../services/emailService');
 const { TRANSACTION_TYPES } = require('../config/constants');
 
@@ -21,7 +22,11 @@ function generateVerificationToken() {
 }
 
 // Register
-router.post('/register', validate(registerSchema), async (req, res, next) => {
+router.post(
+  '/register',
+  validate(registerSchema),
+  validateRecaptcha,
+  async (req, res, next) => {
   try {
     const { email, password, first_name, last_name } = req.body;
     const locale = req.headers['x-locale'] || 'en';
@@ -97,7 +102,11 @@ router.post('/register', validate(registerSchema), async (req, res, next) => {
 });
 
 // Login
-router.post('/login', validate(loginSchema), async (req, res, next) => {
+router.post(
+  '/login',
+  validate(loginSchema),
+  validateRecaptcha,
+  async (req, res, next) => {
   try {
     const { email, password } = req.body;
 
@@ -326,6 +335,7 @@ router.put('/change-password', authenticateToken, async (req, res, next) => {
 router.post(
   '/forgot-password',
   validate(forgotPasswordSchema),
+  validateRecaptcha,
   async (req, res, next) => {
     try {
       const { email } = req.body;

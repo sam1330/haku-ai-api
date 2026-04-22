@@ -1,8 +1,9 @@
 const express = require('express');
+const crypto = require('crypto');
 const { authenticateToken } = require('../middleware/auth');
 const creditService = require('../services/creditService');
 const { TRANSACTION_TYPES } = require('../config/constants');
-const { stripe, createCheckoutSession } = require('../services/stripeService');
+const { createCheckoutSession } = require('../services/lemonSqueezyService');
 const plans = require('../config/plans');
 const db = require('../config/database');
 
@@ -68,7 +69,7 @@ router.post(
       // Record the pending payment
       await db('payments').insert({
         user_id: user.id,
-        stripe_checkout_session_id: session.id,
+        lemonsqueezy_checkout_id: session.id,
         amount: plan.amount,
         currency: 'usd',
         status: 'pending',
@@ -77,7 +78,7 @@ router.post(
         metadata: JSON.stringify({ locale }),
       });
 
-      res.json({ url: session.url });
+      res.json({ url: session.attributes.url });
     } catch (error) {
       next(error);
     }
@@ -92,86 +93,110 @@ router.post(
   '/webhook',
   express.raw({ type: 'application/json' }),
   async (req, res) => {
-    const sig = req.headers['stripe-signature'];
-    let event;
+    const secret = process.env.LEMON_SQUEEZY_WEBHOOK_SECRET;
+    const signature = req.headers['x-signature'];
 
-    try {
-      event = stripe.webhooks.constructEvent(
-        req.rawBody,
-        sig,
-        process.env.STRIPE_WEBHOOK_SECRET,
-      );
-    } catch (err) {
-      console.error(`Webhook Signature Error: ${err.message}`);
-      return res.status(400).send(`Webhook Error: ${err.message}`);
+    if (!signature) {
+      return res.status(401).send('Missing signature');
     }
 
+    const hmac = crypto.createHmac('sha256', secret);
+    const digest = Buffer.from(hmac.update(req.body).digest('hex'), 'utf8');
+    const signatureBuffer = Buffer.from(signature, 'utf8');
+
+    let isValid = false;
     try {
-      if (event.type === 'checkout.session.completed') {
-        const session = event.data.object;
+      isValid = crypto.timingSafeEqual(digest, signatureBuffer);
+    } catch (e) {
+      // Ignore error
+    }
 
-        const { userId, plan_name, credits } = session.metadata;
+    if (!isValid) {
+      return res.status(401).send('Invalid signature');
+    }
 
-        // Atomic update: Mark payment as succeeded and add credits
+    const event = JSON.parse(req.body.toString());
+    const eventName = event.meta.event_name;
+
+    try {
+      if (eventName === 'order_created') {
+        const order = event.data.attributes;
+        const customData = event.meta.custom_data;
+
+        if (!customData || !customData.userId) {
+          console.log('No custom data found in webhook, ignoring.');
+          return res.json({ received: true });
+        }
+
+        const { userId, plan_name, credits } = customData;
+        const orderId = event.data.id;
+        const customerId = order.customer_id;
+
         await db.transaction(async (trx) => {
-          const payment = await trx('payments')
-            .where('stripe_checkout_session_id', session.id)
-            .forUpdate()
-            .first();
-
-          if (payment && payment.status === 'succeeded') {
-            console.log(
-              `Payment ${session.id} already processed (status check)`,
-            );
-            return;
-          }
-
-          // Double-check credit_transactions to be absolutely sure
+          // Ensure we haven't processed this order yet
           const existingTx = await trx('credit_transactions')
-            .whereRaw("metadata->>'stripe_session_id' = ?", [session.id])
+            .whereRaw("metadata->>'lemonsqueezy_order_id' = ?", [orderId])
             .first();
 
           if (existingTx) {
-            console.log(
-              `Credits already granted for session ${session.id} (tx check)`,
-            );
+            console.log(`Order ${orderId} already processed.`);
             return;
           }
 
-          // Update payment status
-          await trx('payments')
-            .where('stripe_checkout_session_id', session.id)
-            .update({
+          // Mark pending payment as succeeded or insert a new one
+          const pendingPayment = await trx('payments')
+            .where({ user_id: userId, status: 'pending', plan_name })
+            .first();
+
+          if (pendingPayment) {
+            await trx('payments')
+              .where('id', pendingPayment.id)
+              .update({
+                status: 'succeeded',
+                lemonsqueezy_checkout_id: orderId, // store order id
+                metadata: JSON.stringify({
+                  ...pendingPayment.metadata,
+                  lemonsqueezy_customer_id: customerId,
+                  order_id: orderId,
+                }),
+              });
+          } else {
+            await trx('payments').insert({
+              user_id: userId,
+              lemonsqueezy_checkout_id: orderId,
+              amount: order.total,
+              currency: order.currency,
               status: 'succeeded',
+              plan_name: plan_name,
+              credits_added: parseInt(credits),
               metadata: JSON.stringify({
-                ...payment?.metadata,
-                stripe_customer_id: session.customer,
-                payment_intent_id: session.payment_intent,
+                lemonsqueezy_customer_id: customerId,
+                order_id: orderId,
               }),
             });
+          }
 
           // Add credits
           await creditService.addCredits(
             userId,
             parseInt(credits),
             TRANSACTION_TYPES.TOP_UP,
-            `Stripe Top-up: ${plan_name}`,
+            `Lemon Squeezy Top-up: ${plan_name}`,
             {
               metadata: {
-                stripe_session_id: session.id,
-                payment_intent_id: session.payment_intent,
+                lemonsqueezy_order_id: orderId,
               },
             },
           );
 
-          // Update user's stripe customer id if needed
+          // Update user's customer id
           await trx('users')
             .where('id', userId)
-            .update({ stripe_customer_id: session.customer });
+            .update({ lemonsqueezy_customer_id: customerId.toString() });
         });
 
         console.log(
-          `Successfully processed payment for user ${userId}, plan ${plan_name}`,
+          `Successfully processed Lemon Squeezy order for user ${userId}, plan ${plan_name}`,
         );
       }
 

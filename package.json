@@ -9,7 +9,8 @@
     "test": "jest --runInBand --forceExit",
     "test:db": "node scripts/test-db.js",
     "migrate": "knex migrate:latest",
-    "seed": "knex seed:run"
+    "seed": "knex seed:run",
+    "prepare": "husky"
   },
   "keywords": [
     "resume",
@@ -58,5 +59,12 @@
     ],
     "testTimeout": 30000,
     "clearMocks": true
+  },
+  "lint-staged": {
+    "*.js": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "**/*": "prettier --write --ignore-unknown"
   }
 }

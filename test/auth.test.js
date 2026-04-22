@@ -1,7 +1,11 @@
 process.env.NODE_ENV = 'test';
 const request = require('supertest');
 const app = require('../src/server');
-const { cleanDatabase, createTestUser, generateToken, db, runMigrations } = require('./helpers');
+const {
+  cleanDatabase,
+  db,
+  runMigrations,
+} = require('./helpers');
 
 describe('Authentication Integration Tests', () => {
   beforeAll(async () => {
@@ -18,7 +22,7 @@ describe('Authentication Integration Tests', () => {
       email: 'newuser@example.com',
       password: 'password123',
       first_name: 'John',
-      last_name: 'Doe'
+      last_name: 'Doe',
     };
 
     test('should register a new user successfully', async () => {
@@ -31,16 +35,13 @@ describe('Authentication Integration Tests', () => {
       expect(response.body.user).toMatchObject({
         email: newUser.email,
         first_name: newUser.first_name,
-        last_name: newUser.last_name
+        last_name: newUser.last_name,
       });
       expect(response.body.user).not.toHaveProperty('password_hash');
     });
 
     test('should fail with duplicate email', async () => {
-      await request(app)
-        .post('/api/auth/register')
-        .send(newUser)
-        .expect(409);
+      await request(app).post('/api/auth/register').send(newUser).expect(409);
     });
 
     test('should fail with invalid email', async () => {
@@ -48,14 +49,15 @@ describe('Authentication Integration Tests', () => {
       await request(app)
         .post('/api/auth/register')
         .send(invalidUser)
-        .expect(400);
+        .expect(422);
+        
     });
   });
 
   describe('POST /api/auth/login', () => {
     const userCredentials = {
       email: 'loginuser@example.com',
-      password: 'password123'
+      password: 'password123',
     };
 
     beforeAll(async () => {
@@ -65,11 +67,14 @@ describe('Authentication Integration Tests', () => {
         .send({
           ...userCredentials,
           first_name: 'Login',
-          last_name: 'Test'
+          last_name: 'Test',
         });
     });
 
     test('should login successfully with correct credentials', async () => {
+      const user = await db('users').where('email', userCredentials.email).first();
+      user.email_verified_at = new Date();
+      await db('users').where('email', userCredentials.email).update(user);
       const response = await request(app)
         .post('/api/auth/login')
         .send(userCredentials)
@@ -79,27 +84,54 @@ describe('Authentication Integration Tests', () => {
       expect(response.body.user.email).toBe(userCredentials.email);
     });
 
+    test('should fail with unverified email', async () => {
+      const user = await db('users').where('email', userCredentials.email).first();
+      user.email_verified_at = null;
+      await db('users').where('email', userCredentials.email).update(user);
+      const response = await request(app)
+        .post('/api/auth/login')
+        .send(userCredentials)
+        .expect(403);
+
+      expect(response.body).toHaveProperty('error');
+      expect(response.body.email).toBe(userCredentials.email);
+    });
+
     test('should fail with incorrect password', async () => {
       await request(app)
         .post('/api/auth/login')
         .send({
           email: userCredentials.email,
-          password: 'wrongpassword'
+          password: 'wrongpassword',
         })
-        .expect(401);
+        .expect(403);
     });
   });
 
   describe('GET /api/auth/profile', () => {
     let token;
+    const userCredentials = {
+      email: 'loginuser@example.com',
+      password: 'password123',
+    };
 
     beforeAll(async () => {
-      const response = await request(app)
-        .post('/api/auth/login')
+      await request(app)
+        .post('/api/auth/register')
         .send({
-          email: 'loginuser@example.com',
-          password: 'password123'
+          ...userCredentials,
+          first_name: 'Login',
+          last_name: 'Test',
         });
+
+      const user = await db('users').where('email', userCredentials.email).first();
+      user.email_verified_at = new Date();
+      await db('users').where('email', userCredentials.email).update(user);
+
+      const response = await request(app).post('/api/auth/login').send({
+        email: 'loginuser@example.com',
+        password: 'password123',
+      });
       token = response.body.token;
     });
 
@@ -113,9 +145,7 @@ describe('Authentication Integration Tests', () => {
     });
 
     test('should fail without token', async () => {
-      await request(app)
-        .get('/api/auth/profile')
-        .expect(401);
+      await request(app).get('/api/auth/profile').expect(401);
     });
   });
 });

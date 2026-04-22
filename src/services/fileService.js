@@ -1,23 +1,35 @@
-import multer from "multer";
-import path from "path";
-import mammoth from "mammoth";
-import { v4 } from "uuid";
-import {
+// import multer from 'multer';
+// import path from 'path';
+// import mammoth from 'mammoth';
+// import { v4 } from 'uuid';
+// import {
+//   S3Client,
+//   PutObjectCommand,
+//   DeleteObjectCommand,
+//   paginateListObjectsV2,
+//   GetObjectCommand,
+// } from '@aws-sdk/client-s3';
+// import { PDFParse } from 'pdf-parse';
+
+const multer = require('multer');
+const path = require('path');
+const mammoth = require('mammoth');
+const { v4 } = require('uuid');
+const {
   S3Client,
   PutObjectCommand,
   DeleteObjectCommand,
-  paginateListObjectsV2,
   GetObjectCommand,
-} from "@aws-sdk/client-s3";
-import { PDFParse } from "pdf-parse";
+} = require('@aws-sdk/client-s3');
+const { PDFParse } = require('pdf-parse');
 
-export default class FileService {
+class FileService {
   constructor() {
     this.maxFileSize = parseInt(process.env.MAX_FILE_SIZE) || 10 * 1024 * 1024; // 10MB
     this.allowedMimeTypes = [
-      "application/pdf",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      "application/msword",
+      'application/pdf',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/msword',
     ];
 
     this.initializeUploadDirectory();
@@ -34,7 +46,7 @@ export default class FileService {
       });
       this.bucket = process.env.AWS_BUCKET_NAME;
     } catch (error) {
-      console.error("Failed to create upload directory:", error);
+      console.error('Failed to create upload directory:', error);
     }
   }
 
@@ -47,7 +59,7 @@ export default class FileService {
         cb(null, true);
       } else {
         cb(
-          new Error("Invalid file type. Only PDF and DOCX files are allowed."),
+          new Error('Invalid file type. Only PDF and DOCX files are allowed.'),
           false,
         );
       }
@@ -65,13 +77,13 @@ export default class FileService {
 
   async extractTextFromFile(filePath, fileType) {
     try {
-      let extractedText = "";
+      let extractedText = '';
 
       switch (fileType.toLowerCase()) {
-        case "pdf":
+        case 'pdf':
           extractedText = await this.extractFromPDF(filePath);
           break;
-        case "docx":
+        case 'docx':
           extractedText = await this.extractFromDOCX(filePath);
           break;
         default:
@@ -80,7 +92,7 @@ export default class FileService {
 
       return this.cleanExtractedText(extractedText);
     } catch (error) {
-      console.error("Text extraction error:", error);
+      console.error('Text extraction error:', error);
       throw new Error(`Failed to extract text from file: ${error.message}`);
     }
   }
@@ -119,26 +131,26 @@ export default class FileService {
    * and the content within them.
    */
   extractTextFromBuilderCv(obj) {
-    let text = "";
+    let text = '';
 
     for (const key in obj) {
       // 1. If the key is a section title (e.g., "experience"), add it to the text
       // We filter out generic keys like 'cv' or 'metadata'
-      if (isNaN(Number(key)) && key !== "cv" && key !== "design") {
-        text += key + " ";
+      if (isNaN(Number(key)) && key !== 'cv' && key !== 'design') {
+        text += key + ' ';
       }
 
       const value = obj[key];
 
       // 2. Standard recursive extraction for the values
-      if (typeof value === "string") {
-        text += value + " ";
+      if (typeof value === 'string') {
+        text += value + ' ';
       } else if (Array.isArray(value)) {
         value.forEach((item) => {
-          if (typeof item === "string") text += item + " ";
+          if (typeof item === 'string') text += item + ' ';
           else text += this.extractTextFromBuilderCv(item);
         });
-      } else if (typeof value === "object" && value !== null) {
+      } else if (typeof value === 'object' && value !== null) {
         text += this.extractTextFromBuilderCv(value);
       }
     }
@@ -147,25 +159,25 @@ export default class FileService {
   }
 
   cleanExtractedText(text) {
-    if (!text) return "";
+    if (!text) return '';
 
     return text
-      .replace(/\s+/g, " ") // Replace multiple whitespace with single space
-      .replace(/\n\s*\n/g, "\n") // Remove empty lines
+      .replace(/\s+/g, ' ') // Replace multiple whitespace with single space
+      .replace(/\n\s*\n/g, '\n') // Remove empty lines
       .trim();
   }
 
   getFileTypeFromMimeType(mimeType) {
     const mimeToType = {
-      "application/pdf": "pdf",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
-        "docx",
-      "application/msword": "doc",
+      'application/pdf': 'pdf',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+        'docx',
+      'application/msword': 'doc',
     };
-    return mimeToType[mimeType] || "unknown";
+    return mimeToType[mimeType] || 'unknown';
   }
 
-  async storeFile(buffer, originalName, mimeType = "application/pdf") {
+  async storeFile(buffer, originalName, mimeType = 'application/pdf') {
     const key = `resumes/${this.generateUniqueFilename(originalName)}`;
 
     await this.s3.send(
@@ -190,7 +202,7 @@ export default class FileService {
       );
       return true;
     } catch (error) {
-      console.error("File deletion error:", error);
+      console.error('File deletion error:', error);
       return false;
     }
   }
@@ -214,4 +226,5 @@ export default class FileService {
 }
 
 const fileService = new FileService();
-export { fileService };
+
+module.exports = fileService;

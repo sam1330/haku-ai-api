@@ -14,33 +14,55 @@ class AIService {
     console.log('GCP_LOCATION:', this.location);
 
     if (!this.project) {
-      console.warn("GCP_PROJECT_ID is not set. AI services will fail.");
+      console.warn('GCP_PROJECT_ID is not set. AI services will fail.');
     }
 
-    this.vertexAI = new VertexAI({ project: this.project, location: this.location });
+    this.vertexAI = new VertexAI({
+      project: this.project,
+      location: this.location,
+    });
     // Using gemini-1.5-flash as a cost-effective alternative to GPT-4
     this.modelName = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
-    this.model = this.vertexAI.preview.getGenerativeModel({ model: this.modelName });
+    this.model = this.vertexAI.preview.getGenerativeModel({
+      model: this.modelName,
+    });
   }
 
-  async analyzeResume(resumeText, jobDescription, targetRole = null, targetCompany = null, userId = null, locale) {
+  async analyzeResume(
+    resumeText,
+    jobDescription,
+    targetRole = null,
+    targetCompany = null,
+    userId = null,
+    locale,
+  ) {
     let creditTx = null;
     try {
       if (userId) {
         creditTx = await creditService.deductCredits(
-          userId, 
-          CREDIT_COSTS.RESUME_ANALYSIS, 
-          'Resume Analysis'
+          userId,
+          CREDIT_COSTS.RESUME_ANALYSIS,
+          'Resume Analysis',
         );
       }
 
-      const prompt = this.buildResumeAnalysisPrompt(resumeText, jobDescription, targetRole, targetCompany, locale);
+      const prompt = this.buildResumeAnalysisPrompt(
+        resumeText,
+        jobDescription,
+        targetRole,
+        targetCompany,
+        locale,
+      );
 
       const request = {
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
         systemInstruction: {
           role: 'system',
-          parts: [{ text: `You are an expert resume analyst and career coach. Analyze resumes for ATS compatibility, keyword optimization, and overall effectiveness. Provide specific, actionable feedback. Be extremely concise. Use bullet points within strings. Limit the overview to 3 sentences. Do not over-extend the response, try to keep it under 500 words. You MUST generate the analysis in the following language: ${LOCALES[locale]}.` }]
+          parts: [
+            {
+              text: `You are an expert resume analyst and career coach. Analyze resumes for ATS compatibility, keyword optimization, and overall effectiveness. Provide specific, actionable feedback. Be extremely concise. Use bullet points within strings. Limit the overview to 3 sentences. Do not over-extend the response, try to keep it under 500 words. You MUST generate the analysis in the following language: ${LOCALES[locale]}.`,
+            },
+          ],
         },
         generationConfig: {
           maxOutputTokens: 5000,
@@ -53,15 +75,15 @@ class AIService {
               overview: { type: 'string' },
               strongPoints: {
                 type: 'array',
-                items: { type: 'string' }
+                items: { type: 'string' },
               },
               weaknesses: {
                 type: 'array',
-                items: { type: 'string' }
+                items: { type: 'string' },
               },
-              atsScore: { type: 'number' }
-            }
-          }
+              atsScore: { type: 'number' },
+            },
+          },
         },
       };
 
@@ -71,14 +93,16 @@ class AIService {
       const analysis = JSON.parse(response.candidates[0].content.parts[0].text);
 
       const usageMetadata = response.usageMetadata;
-      const tokensUsed = (usageMetadata.promptTokenCount || 0) + (usageMetadata.candidatesTokenCount || 0);
+      const tokensUsed =
+        (usageMetadata.promptTokenCount || 0) +
+        (usageMetadata.candidatesTokenCount || 0);
       const cost = this.calculateCost(tokensUsed, this.modelName);
 
       return {
         analysis,
         tokensUsed,
         cost,
-        model: this.modelName
+        model: this.modelName,
       };
     } catch (error) {
       if (userId && creditTx) {
@@ -89,28 +113,49 @@ class AIService {
     }
   }
 
-  async generateCoverLetter(resumeText, jobDescription, companyName, positionTitle, userId = null, tone = 'professional', length = 'medium', locale = 'en') {
+  async generateCoverLetter(
+    resumeText,
+    jobDescription,
+    companyName,
+    positionTitle,
+    userId = null,
+    tone = 'professional',
+    length = 'medium',
+    locale = 'en',
+  ) {
     let creditTx = null;
     try {
       if (userId) {
         creditTx = await creditService.deductCredits(
-          userId, 
-          CREDIT_COSTS.COVER_LETTER_GENERATION, 
-          'Cover Letter Generation'
+          userId,
+          CREDIT_COSTS.COVER_LETTER_GENERATION,
+          'Cover Letter Generation',
         );
       }
-      const prompt = this.buildCoverLetterPrompt(resumeText, jobDescription, companyName, positionTitle, tone, length, locale);
+      const prompt = this.buildCoverLetterPrompt(
+        resumeText,
+        jobDescription,
+        companyName,
+        positionTitle,
+        tone,
+        length,
+        locale,
+      );
 
       const request = {
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
         systemInstruction: {
           role: 'system',
-          parts: [{ text: `You are a professional career coach and cover letter expert. Write compelling, personalized cover letters that highlight relevant experience and demonstrate genuine interest in the role. You must generate the cover letter in the following language: ${LOCALES[locale]}.` }]
+          parts: [
+            {
+              text: `You are a professional career coach and cover letter expert. Write compelling, personalized cover letters that highlight relevant experience and demonstrate genuine interest in the role. You must generate the cover letter in the following language: ${LOCALES[locale]}.`,
+            },
+          ],
         },
         generationConfig: {
           maxOutputTokens: 2500,
-          temperature: 0.4
-        }
+          temperature: 0.4,
+        },
       };
 
       const result = await this.model.generateContent(request);
@@ -118,14 +163,16 @@ class AIService {
       const coverLetter = response.candidates[0].content.parts[0].text;
 
       const usageMetadata = response.usageMetadata;
-      const tokensUsed = (usageMetadata.promptTokenCount || 0) + (usageMetadata.candidatesTokenCount || 0);
+      const tokensUsed =
+        (usageMetadata.promptTokenCount || 0) +
+        (usageMetadata.candidatesTokenCount || 0);
       const cost = this.calculateCost(tokensUsed, this.modelName);
 
       return {
         coverLetter,
         tokensUsed,
         cost,
-        model: this.modelName
+        model: this.modelName,
       };
     } catch (error) {
       if (userId && creditTx) {
@@ -136,28 +183,41 @@ class AIService {
     }
   }
 
-  async optimizeResume(resumeText, jobDescription, targetRole = null, userId = null) {
+  async optimizeResume(
+    resumeText,
+    jobDescription,
+    targetRole = null,
+    userId = null,
+  ) {
     let creditTx = null;
     try {
       if (userId) {
         creditTx = await creditService.deductCredits(
-          userId, 
-          CREDIT_COSTS.RESUME_OPTIMIZATION, 
-          'Resume Optimization'
+          userId,
+          CREDIT_COSTS.RESUME_OPTIMIZATION,
+          'Resume Optimization',
         );
       }
-      const prompt = this.buildResumeOptimizationPrompt(resumeText, jobDescription, targetRole);
+      const prompt = this.buildResumeOptimizationPrompt(
+        resumeText,
+        jobDescription,
+        targetRole,
+      );
 
       const request = {
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
         systemInstruction: {
           role: 'system',
-          parts: [{ text: "You are an expert resume optimizer. Rewrite and improve resume content to better match job requirements while maintaining authenticity and professional tone." }]
+          parts: [
+            {
+              text: 'You are an expert resume optimizer. Rewrite and improve resume content to better match job requirements while maintaining authenticity and professional tone.',
+            },
+          ],
         },
         generationConfig: {
           maxOutputTokens: 3000,
-          temperature: 0.3
-        }
+          temperature: 0.3,
+        },
       };
 
       const result = await this.model.generateContent(request);
@@ -165,14 +225,16 @@ class AIService {
       const optimizedResume = response.candidates[0].content.parts[0].text;
 
       const usageMetadata = response.usageMetadata;
-      const tokensUsed = (usageMetadata.promptTokenCount || 0) + (usageMetadata.candidatesTokenCount || 0);
+      const tokensUsed =
+        (usageMetadata.promptTokenCount || 0) +
+        (usageMetadata.candidatesTokenCount || 0);
       const cost = this.calculateCost(tokensUsed, this.modelName);
 
       return {
         optimizedResume,
         tokensUsed,
         cost,
-        model: this.modelName
+        model: this.modelName,
       };
     } catch (error) {
       if (userId && creditTx) {
@@ -183,7 +245,12 @@ class AIService {
     }
   }
 
-  buildResumeAnalysisPrompt(resumeText, jobDescription, targetRole, targetCompany) {
+  buildResumeAnalysisPrompt(
+    resumeText,
+    jobDescription,
+    targetRole,
+    targetCompany,
+  ) {
     let prompt = `Please analyze this resume for the following job description:\n\n`;
     prompt += `JOB DESCRIPTION:\n${jobDescription}\n\n`;
 
@@ -208,17 +275,25 @@ class AIService {
     return prompt;
   }
 
-  buildCoverLetterPrompt(resumeText, jobDescription, companyName, positionTitle, tone, length, locale = 'en') {
+  buildCoverLetterPrompt(
+    resumeText,
+    jobDescription,
+    companyName,
+    positionTitle,
+    tone,
+    length,
+    locale = 'en',
+  ) {
     const lengthInstructions = {
       short: 'Keep it concise (50-150 words)',
       medium: 'Write a standard length cover letter (150-250 words)',
-      long: 'Write a detailed cover letter (300-450 words)'
+      long: 'Write a detailed cover letter (300-450 words)',
     };
 
     const toneInstructions = {
       professional: 'Use a formal, professional tone',
       casual: 'Use a friendly, approachable tone while remaining professional',
-      enthusiastic: 'Use an energetic, passionate tone that shows excitement'
+      enthusiastic: 'Use an energetic, passionate tone that shows excitement',
     };
 
     let prompt = `Write a ${tone} cover letter in ${LOCALES[locale]} for the ${positionTitle} position at ${companyName}.\n\n`;
@@ -268,9 +343,9 @@ class AIService {
 
     const pricing = {
       'gemini-2.5-flash': {
-        input: 0.30 / 1000000,
-        output: 2.50 / 1000000
-      }
+        input: 0.3 / 1000000,
+        output: 2.5 / 1000000,
+      },
     };
 
     // Simple estimation since we don't strictly separate input/output tokens in the simpler flow above without inspection
@@ -283,10 +358,10 @@ class AIService {
     // The methods above calculate cost themselves now using specific tokens.
 
     // RE-DESIGN: calculateCost in the methods above is passed `tokensUsed` which is a TOTAL.
-    // I should probably simplify this just to return a rough estimate or 0, 
+    // I should probably simplify this just to return a rough estimate or 0,
     // OR, I can be smarter in the method bodies.
 
-    // Let's assume the callers (inside this class) will just rely on this method. 
+    // Let's assume the callers (inside this class) will just rely on this method.
     // But since I changed the implementation above to calculate cost inside the method using this helper...
     // actually, in the replaced code above I passed `tokensUsed` (total) to `calculateCost`.
     // I should probably update `calculateCost` to take `promptTokens` and `completionTokens`.
@@ -301,15 +376,24 @@ class AIService {
   calculatePreciseCost(promptTokens, completionTokens, model) {
     const pricing = {
       'gemini-2.5-flash': {
-        input: 0.30 / 1000000,
-        output: 2.50 / 1000000
-      }
+        input: 0.3 / 1000000,
+        output: 2.5 / 1000000,
+      },
     };
     const modelPricing = pricing[model] || pricing['gemini-2.5-flash'];
-    return (promptTokens * modelPricing.input) + (completionTokens * modelPricing.output);
+    return (
+      promptTokens * modelPricing.input + completionTokens * modelPricing.output
+    );
   }
 
-  async logAIRequest(userId, requestType, inputData, responseData, tokensUsed, cost) {
+  async logAIRequest(
+    userId,
+    requestType,
+    inputData,
+    responseData,
+    tokensUsed,
+    cost,
+  ) {
     try {
       await db('ai_requests').insert({
         user_id: userId,
@@ -318,7 +402,7 @@ class AIService {
         response_data: responseData,
         status: 'completed',
         tokens_used: tokensUsed,
-        cost: cost
+        cost: cost,
       });
     } catch (error) {
       console.error('Failed to log AI request:', error);
@@ -328,4 +412,3 @@ class AIService {
 }
 
 module.exports = new AIService();
-

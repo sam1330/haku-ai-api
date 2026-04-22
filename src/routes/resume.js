@@ -1,33 +1,34 @@
-const express = require("express");
-const db = require("../config/database");
+const express = require('express');
+const db = require('../config/database');
+const { authenticateToken } = require('../middleware/auth');
 const {
-  authenticateToken,
-  requireSubscription,
-} = require("../middleware/auth");
-const { validate, resumeAnalysisSchema, resumeSchema } = require("../middleware/validation");
-const { fileService } = require("../services/fileService");
-const aiService = require("../services/aiService");
-const { checkCredits } = require("../middleware/creditMiddleware");
-const enums = require("../enums");
-const { generatePDF } = require("../services/playwrightService");
+  validate,
+  resumeAnalysisSchema,
+  resumeSchema,
+} = require('../middleware/validation');
+const fileService = require('../services/fileService');
+const aiService = require('../services/aiService');
+const { checkCredits } = require('../middleware/creditMiddleware');
+const enums = require('../enums');
+const { generatePDF } = require('../services/playwrightService');
 
 const router = express.Router();
 
 // Upload resume
 router.post(
-  "/upload",
+  '/upload',
   authenticateToken,
-  fileService.getMulterConfig().single("resume"),
+  fileService.getMulterConfig().single('resume'),
   async (req, res, next) => {
     try {
       if (!req.file) {
         return res.status(400).json({
-          error: "No file uploaded",
-          code: "NO_FILE",
+          error: 'No file uploaded',
+          code: 'NO_FILE',
         });
       }
 
-      const { originalname, filename, mimetype, size } = req.file;
+      const { originalname, mimetype, size } = req.file;
       const fileType = fileService.getFileTypeFromMimeType(mimetype);
 
       // Save file to S3
@@ -44,7 +45,7 @@ router.post(
       );
 
       // Save resume record to database
-      const [resume] = await db("resumes")
+      const [resume] = await db('resumes')
         .insert({
           user_id: req.user.id,
           original_filename: originalname,
@@ -56,15 +57,15 @@ router.post(
           source: enums.RESUME_SOURCE_TYPES.UPLOAD,
         })
         .returning([
-          "id",
-          "original_filename",
-          "file_type",
-          "file_size",
-          "created_at",
+          'id',
+          'original_filename',
+          'file_type',
+          'file_size',
+          'created_at',
         ]);
 
       res.status(201).json({
-        message: "Resume uploaded and processed successfully",
+        message: 'Resume uploaded and processed successfully',
         resume: {
           id: resume.id,
           original_filename: resume.original_filename,
@@ -86,40 +87,40 @@ router.post(
 
 // Analyze resume
 router.post(
-  "/:resume_id/analyze",
+  '/:resume_id/analyze',
   authenticateToken,
-  checkCredits("RESUME_ANALYSIS"),
+  checkCredits('RESUME_ANALYSIS'),
   validate(resumeAnalysisSchema),
   async (req, res, next) => {
     try {
       const { job_description, target_role, target_company } = req.body;
       const { resume_id } = req.params;
-      const locale = req.headers["x-locale"] || "en";
+      const locale = req.headers['x-locale'] || 'en';
 
       if (!resume_id) {
         return res.status(400).json({
-          error: "Resume ID is required",
-          code: "MISSING_RESUME_ID",
+          error: 'Resume ID is required',
+          code: 'MISSING_RESUME_ID',
         });
       }
 
       // Get resume
-      const resume = await db("resumes")
-        .where("id", resume_id)
-        .where("user_id", req.user.id)
+      const resume = await db('resumes')
+        .where('id', resume_id)
+        .where('user_id', req.user.id)
         .first();
 
       if (!resume) {
         return res.status(404).json({
-          error: "Resume not found",
-          code: "RESUME_NOT_FOUND",
+          error: 'Resume not found',
+          code: 'RESUME_NOT_FOUND',
         });
       }
 
       if (!resume.extracted_text) {
         return res.status(400).json({
-          error: "Resume text not available for analysis",
-          code: "NO_RESUME_TEXT",
+          error: 'Resume text not available for analysis',
+          code: 'NO_RESUME_TEXT',
         });
       }
 
@@ -130,11 +131,11 @@ router.post(
         target_role,
         target_company,
         req.user.id,
-        locale
+        locale,
       );
 
       // Save analysis results to the new table
-      const [analysis] = await db("resume_analysis")
+      await db('resume_analysis')
         .insert({
           resume_id: resume_id,
           user_id: req.user.id,
@@ -143,12 +144,12 @@ router.post(
           job_description: job_description,
           analysis_results: analysisResult.analysis,
         })
-        .returning("*");
+        .returning('*');
 
       // Log AI request
       await aiService.logAIRequest(
         req.user.id,
-        "resume_analysis",
+        'resume_analysis',
         { resume_id, job_description, target_role, target_company },
         { analysis: analysisResult.analysis },
         analysisResult.tokensUsed,
@@ -156,7 +157,7 @@ router.post(
       );
 
       res.json({
-        message: "Resume analysis completed",
+        message: 'Resume analysis completed',
         analysis: analysisResult.analysis,
         metadata: {
           tokens_used: analysisResult.tokensUsed,
@@ -173,9 +174,9 @@ router.post(
 
 // Optimize resume
 router.post(
-  "/optimize",
+  '/optimize',
   authenticateToken,
-  checkCredits("RESUME_OPTIMIZATION"),
+  checkCredits('RESUME_OPTIMIZATION'),
   validate(resumeAnalysisSchema),
   async (req, res, next) => {
     try {
@@ -184,28 +185,28 @@ router.post(
 
       if (!resume_id) {
         return res.status(400).json({
-          error: "Resume ID is required",
-          code: "MISSING_RESUME_ID",
+          error: 'Resume ID is required',
+          code: 'MISSING_RESUME_ID',
         });
       }
 
       // Get resume
-      const resume = await db("resumes")
-        .where("id", resume_id)
-        .where("user_id", req.user.id)
+      const resume = await db('resumes')
+        .where('id', resume_id)
+        .where('user_id', req.user.id)
         .first();
 
       if (!resume) {
         return res.status(404).json({
-          error: "Resume not found",
-          code: "RESUME_NOT_FOUND",
+          error: 'Resume not found',
+          code: 'RESUME_NOT_FOUND',
         });
       }
 
       if (!resume.extracted_text) {
         return res.status(400).json({
-          error: "Resume text not available for optimization",
-          code: "NO_RESUME_TEXT",
+          error: 'Resume text not available for optimization',
+          code: 'NO_RESUME_TEXT',
         });
       }
 
@@ -220,7 +221,7 @@ router.post(
       // Log AI request
       await aiService.logAIRequest(
         req.user.id,
-        "resume_optimization",
+        'resume_optimization',
         { resume_id, job_description, target_role },
         { optimized_resume: optimizationResult.optimizedResume },
         optimizationResult.tokensUsed,
@@ -228,7 +229,7 @@ router.post(
       );
 
       res.json({
-        message: "Resume optimization completed",
+        message: 'Resume optimization completed',
         optimized_resume: optimizationResult.optimizedResume,
         metadata: {
           tokens_used: optimizationResult.tokensUsed,
@@ -243,32 +244,32 @@ router.post(
 );
 
 // Get user's resumes
-router.get("/", authenticateToken, async (req, res, next) => {
+router.get('/', authenticateToken, async (req, res, next) => {
   try {
     const { page = 1, limit = 10 } = req.query;
     const offset = (page - 1) * limit;
 
-    const resumes = await db("resumes")
-      .where("user_id", req.user.id)
+    const resumes = await db('resumes')
+      .where('user_id', req.user.id)
       .select(
-        "id",
-        "original_filename",
-        "file_type",
-        "file_size",
-        "is_processed",
-        "created_at",
-        "updated_at",
-        "source",
+        'id',
+        'original_filename',
+        'file_type',
+        'file_size',
+        'is_processed',
+        'created_at',
+        'updated_at',
+        'source',
       )
-      .orderBy("created_at", "desc")
+      .orderBy('created_at', 'desc')
       .limit(limit)
       .offset(offset);
 
     // Fetch the latest analysis for each resume
     const resumeIds = resumes.map((r) => r.id);
-    const latestAnalyses = await db("resume_analysis")
-      .whereIn("resume_id", resumeIds)
-      .orderBy("created_at", "desc");
+    const latestAnalyses = await db('resume_analysis')
+      .whereIn('resume_id', resumeIds)
+      .orderBy('created_at', 'desc');
 
     // Map latest analysis to each resume
     const resumesWithAnalysis = resumes.map((resume) => {
@@ -279,9 +280,9 @@ router.get("/", authenticateToken, async (req, res, next) => {
       };
     });
 
-    const total = await db("resumes")
-      .where("user_id", req.user.id)
-      .count("* as count")
+    const total = await db('resumes')
+      .where('user_id', req.user.id)
+      .count('* as count')
       .first();
 
     res.json({
@@ -300,7 +301,7 @@ router.get("/", authenticateToken, async (req, res, next) => {
 
 // Create new resume
 router.post(
-  "/",
+  '/',
   authenticateToken,
   validate(resumeSchema),
   async (req, res, next) => {
@@ -309,25 +310,27 @@ router.post(
 
       const extractedText = fileService.extractTextFromBuilderCv(metadata.cv);
 
-      const [resume] = await db("resumes").insert({
-        user_id: req.user.id,
-        extracted_text: extractedText,
-        original_filename,
-        metadata,
-        source: enums.RESUME_SOURCE_TYPES.BUILDER,
-        is_processed: true
-      }).returning([
-          "id",
-          "original_filename",
-          "metadata",
-          "source",
-          "created_at",
+      const [resume] = await db('resumes')
+        .insert({
+          user_id: req.user.id,
+          extracted_text: extractedText,
+          original_filename,
+          metadata,
+          source: enums.RESUME_SOURCE_TYPES.BUILDER,
+          is_processed: true,
+        })
+        .returning([
+          'id',
+          'original_filename',
+          'metadata',
+          'source',
+          'created_at',
         ]);
 
       res.json({
-        message: "Resume created successfully",
+        message: 'Resume created successfully',
         resume: resume,
-      })
+      });
     } catch (error) {
       next(error);
     }
@@ -336,7 +339,7 @@ router.post(
 
 // Update builded resume
 router.put(
-  "/:resume_id",
+  '/:resume_id',
   authenticateToken,
   validate(resumeSchema),
   async (req, res, next) => {
@@ -345,24 +348,27 @@ router.put(
 
       const extractedText = fileService.extractTextFromBuilderCv(metadata.cv);
 
-      const [resume] = await db("resumes").where("id", req.params.resume_id).update({
-        user_id: req.user.id,
-        extracted_text: extractedText,
-        original_filename,
-        metadata,
-        source: enums.RESUME_SOURCE_TYPES.BUILDER,
-      }).returning([
-          "id",
-          "original_filename",
-          "metadata",
-          "source",
-          "created_at",
+      const [resume] = await db('resumes')
+        .where('id', req.params.resume_id)
+        .update({
+          user_id: req.user.id,
+          extracted_text: extractedText,
+          original_filename,
+          metadata,
+          source: enums.RESUME_SOURCE_TYPES.BUILDER,
+        })
+        .returning([
+          'id',
+          'original_filename',
+          'metadata',
+          'source',
+          'created_at',
         ]);
 
       res.json({
-        message: "Resume updated successfully",
+        message: 'Resume updated successfully',
         resume: resume,
-      })
+      });
     } catch (error) {
       next(error);
     }
@@ -370,19 +376,19 @@ router.put(
 );
 
 // Get specific resume
-router.get("/:id", authenticateToken, async (req, res, next) => {
+router.get('/:id', authenticateToken, async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    const resume = await db("resumes")
-      .where("id", id)
-      .where("user_id", req.user.id)
+    const resume = await db('resumes')
+      .where('id', id)
+      .where('user_id', req.user.id)
       .first();
 
     if (!resume) {
       return res.status(404).json({
-        error: "Resume not found",
-        code: "RESUME_NOT_FOUND",
+        error: 'Resume not found',
+        code: 'RESUME_NOT_FOUND',
       });
     }
 
@@ -390,9 +396,9 @@ router.get("/:id", authenticateToken, async (req, res, next) => {
     const { extracted_text, ...resumeData } = resume;
 
     // Fetch the latest analysis for this specific resume
-    const latestAnalysis = await db("resume_analysis")
-      .where("resume_id", id)
-      .orderBy("created_at", "desc")
+    const latestAnalysis = await db('resume_analysis')
+      .where('resume_id', id)
+      .orderBy('created_at', 'desc')
       .first();
 
     res.json({
@@ -407,26 +413,26 @@ router.get("/:id", authenticateToken, async (req, res, next) => {
 });
 
 // Get all analyses for a specific resume
-router.get("/:id/analyses", authenticateToken, async (req, res, next) => {
+router.get('/:id/analyses', authenticateToken, async (req, res, next) => {
   try {
     const { id } = req.params;
 
     // Check if resume exists and belongs to user
-    const resume = await db("resumes")
-      .where("id", id)
-      .where("user_id", req.user.id)
+    const resume = await db('resumes')
+      .where('id', id)
+      .where('user_id', req.user.id)
       .first();
 
     if (!resume) {
       return res.status(404).json({
-        error: "Resume not found",
-        code: "RESUME_NOT_FOUND",
+        error: 'Resume not found',
+        code: 'RESUME_NOT_FOUND',
       });
     }
 
-    const analyses = await db("resume_analysis")
-      .where("resume_id", id)
-      .orderBy("created_at", "desc");
+    const analyses = await db('resume_analysis')
+      .where('resume_id', id)
+      .orderBy('created_at', 'desc');
 
     res.json({
       analyses,
@@ -437,27 +443,27 @@ router.get("/:id/analyses", authenticateToken, async (req, res, next) => {
 });
 
 // Get resume text (for analysis)
-router.get("/:id/text", authenticateToken, async (req, res, next) => {
+router.get('/:id/text', authenticateToken, async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    const resume = await db("resumes")
-      .where("id", id)
-      .where("user_id", req.user.id)
-      .select("extracted_text", "original_filename")
+    const resume = await db('resumes')
+      .where('id', id)
+      .where('user_id', req.user.id)
+      .select('extracted_text', 'original_filename')
       .first();
 
     if (!resume) {
       return res.status(404).json({
-        error: "Resume not found",
-        code: "RESUME_NOT_FOUND",
+        error: 'Resume not found',
+        code: 'RESUME_NOT_FOUND',
       });
     }
 
     if (!resume.extracted_text) {
       return res.status(400).json({
-        error: "Resume text not available",
-        code: "NO_RESUME_TEXT",
+        error: 'Resume text not available',
+        code: 'NO_RESUME_TEXT',
       });
     }
 
@@ -471,19 +477,19 @@ router.get("/:id/text", authenticateToken, async (req, res, next) => {
 });
 
 // Delete resume
-router.delete("/:id", authenticateToken, async (req, res, next) => {
+router.delete('/:id', authenticateToken, async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    const resume = await db("resumes")
-      .where("id", id)
-      .where("user_id", req.user.id)
+    const resume = await db('resumes')
+      .where('id', id)
+      .where('user_id', req.user.id)
       .first();
 
     if (!resume) {
       return res.status(404).json({
-        error: "Resume not found",
-        code: "RESUME_NOT_FOUND",
+        error: 'Resume not found',
+        code: 'RESUME_NOT_FOUND',
       });
     }
 
@@ -491,10 +497,10 @@ router.delete("/:id", authenticateToken, async (req, res, next) => {
     await fileService.deleteFile(resume.file_path);
 
     // Delete from database
-    await db("resumes").where("id", id).del();
+    await db('resumes').where('id', id).del();
 
     res.json({
-      message: "Resume deleted successfully",
+      message: 'Resume deleted successfully',
     });
   } catch (error) {
     next(error);
@@ -503,7 +509,7 @@ router.delete("/:id", authenticateToken, async (req, res, next) => {
 
 // Generate resume
 router.post(
-  "/:resume_id/generate",
+  '/:resume_id/generate',
   authenticateToken,
   async (req, res, next) => {
     try {
@@ -512,9 +518,9 @@ router.post(
 
       const authHeader = req.headers['authorization'];
 
-      const resume = await db("resumes")
-        .where("id", resume_id)
-        .where("user_id", req.user.id)
+      const resume = await db('resumes')
+        .where('id', resume_id)
+        .where('user_id', req.user.id)
         .first();
 
       // const pdfEngineURL = process.env.PDG_ENGINE_URL;
@@ -529,18 +535,24 @@ router.post(
       //   }),
       // });
 
-      const response = await generatePDF(resume_id, locale, authHeader.split(" ")[1]);
+      const response = await generatePDF(
+        resume_id,
+        locale,
+        authHeader.split(' ')[1],
+      );
 
       const pdfBuffer = Buffer.from(response);
 
-      res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", `attachment; filename=${resume.original_filename}.pdf`);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename=${resume.original_filename}.pdf`,
+      );
       res.end(pdfBuffer);
-
     } catch (error) {
       next(error);
     }
-  }
+  },
 );
 
 module.exports = router;

@@ -9,31 +9,43 @@ const checkCredits = (amountOrAction) => {
   return async (req, res, next) => {
     try {
       const userId = req.user.id; // Assumes user is authenticated and attached to req.user
-      
+
       let requiredAmount = 0;
       if (typeof amountOrAction === 'number') {
         requiredAmount = amountOrAction;
-      } else if (typeof amountOrAction === 'string' && CREDIT_COSTS[amountOrAction]) {
+      } else if (
+        typeof amountOrAction === 'string' &&
+        CREDIT_COSTS[amountOrAction]
+      ) {
         requiredAmount = CREDIT_COSTS[amountOrAction];
       } else {
         console.error(`Invalid credit check parameter: ${amountOrAction}`);
-        return res.status(500).json({ error: 'Internal server error during credit check' });
+        return res
+          .status(500)
+          .json({ error: 'Internal server error during credit check' });
       }
 
-      const hasCredits = await creditService.hasSufficientCredits(userId, requiredAmount);
-      
+      const hasCredits = await creditService.hasSufficientCredits(
+        userId,
+        requiredAmount,
+      );
+
       if (!hasCredits) {
         return res.status(402).json({
           error: 'Insufficient credits',
           required: requiredAmount,
-          message: 'You keep running out of fuel! Top up your credits to continue.'
+          message:
+            'You keep running out of fuel! Top up your credits to continue.',
         });
       }
 
       // Attach the cost to the request for easier deduction later
       req.creditCost = requiredAmount;
-      req.creditAction = typeof amountOrAction === 'string' ? amountOrAction : 'unspecified_action';
-      
+      req.creditAction =
+        typeof amountOrAction === 'string'
+          ? amountOrAction
+          : 'unspecified_action';
+
       next();
     } catch (error) {
       console.error('Credit check middleware error:', error);

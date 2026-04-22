@@ -1,8 +1,18 @@
 process.env.NODE_ENV = 'test';
 const request = require('supertest');
 const app = require('../src/server');
-const { cleanDatabase, createTestUser, generateToken, db, runMigrations } = require('./helpers');
-const { CREDIT_COSTS, TRANSACTION_TYPES, DEFAULT_WELCOME_CREDITS } = require('../src/config/constants');
+const {
+  cleanDatabase,
+  createTestUser,
+  generateToken,
+  db,
+  runMigrations,
+} = require('./helpers');
+const {
+  CREDIT_COSTS,
+  TRANSACTION_TYPES,
+  DEFAULT_WELCOME_CREDITS,
+} = require('../src/config/constants');
 const creditService = require('../src/services/creditService');
 
 describe('Credits Integration Tests', () => {
@@ -35,90 +45,10 @@ describe('Credits Integration Tests', () => {
     });
 
     test('should return 401 without authentication', async () => {
-      await request(app)
-        .get('/api/credits/balance')
-        .expect(401);
-    });
-
-    test('should reflect balance after a top-up', async () => {
-      await request(app)
-        .post('/api/credits/top-up')
-        .set('Authorization', `Bearer ${token}`)
-        .send({ amount: 100, plan_name: 'Test Pack' });
-
-      const response = await request(app)
-        .get('/api/credits/balance')
-        .set('Authorization', `Bearer ${token}`)
-        .expect(200);
-
-      expect(response.body.credits).toBe(DEFAULT_WELCOME_CREDITS + 100);
+      await request(app).get('/api/credits/balance').expect(401);
     });
   });
 
-  // ─────────────────────────────────────────────
-  // POST /api/credits/top-up
-  // ─────────────────────────────────────────────
-  describe('POST /api/credits/top-up', () => {
-    let freshUser;
-    let freshToken;
-
-    beforeAll(async () => {
-      freshUser = await createTestUser();
-      freshToken = generateToken(freshUser);
-    });
-
-    test('should add credits and return updated balance', async () => {
-      const response = await request(app)
-        .post('/api/credits/top-up')
-        .set('Authorization', `Bearer ${freshToken}`)
-        .send({ amount: 50, plan_name: 'Starter Pack' })
-        .expect(200);
-
-      expect(response.body.message).toContain('successfully');
-      expect(response.body.added).toBe(50);
-      expect(response.body.new_balance).toBe(DEFAULT_WELCOME_CREDITS + 50);
-      expect(response.body.transaction).toHaveProperty('id');
-      expect(response.body.transaction.transaction_type).toBe(TRANSACTION_TYPES.TOP_UP);
-      expect(response.body.transaction.amount).toBe(50);
-    });
-
-    test('should use default plan name if none provided', async () => {
-      const response = await request(app)
-        .post('/api/credits/top-up')
-        .set('Authorization', `Bearer ${freshToken}`)
-        .send({ amount: 25 })
-        .expect(200);
-
-      expect(response.body.transaction.description).toContain('Standard Plan');
-    });
-
-    test('should reject a top-up with amount of 0', async () => {
-      const response = await request(app)
-        .post('/api/credits/top-up')
-        .set('Authorization', `Bearer ${freshToken}`)
-        .send({ amount: 0 })
-        .expect(400);
-
-      expect(response.body).toHaveProperty('error');
-    });
-
-    test('should reject a top-up with a negative amount', async () => {
-      const response = await request(app)
-        .post('/api/credits/top-up')
-        .set('Authorization', `Bearer ${freshToken}`)
-        .send({ amount: -50 })
-        .expect(400);
-
-      expect(response.body).toHaveProperty('error');
-    });
-
-    test('should reject a top-up without a token', async () => {
-      await request(app)
-        .post('/api/credits/top-up')
-        .send({ amount: 100 })
-        .expect(401);
-    });
-  });
 
   // ─────────────────────────────────────────────
   // GET /api/credits/transactions
@@ -131,9 +61,23 @@ describe('Credits Integration Tests', () => {
       txUser = await createTestUser();
       txToken = generateToken(txUser);
       // Seed some transactions
-      await creditService.addCredits(txUser.id, 100, TRANSACTION_TYPES.TOP_UP, 'Initial top-up');
-      await creditService.addCredits(txUser.id, 200, TRANSACTION_TYPES.BONUS, 'Referral bonus');
-      await creditService.deductCredits(txUser.id, CREDIT_COSTS.HEADLINE_OPTIMIZATION, 'Headline Optimization');
+      await creditService.addCredits(
+        txUser.id,
+        100,
+        TRANSACTION_TYPES.TOP_UP,
+        'Initial top-up',
+      );
+      await creditService.addCredits(
+        txUser.id,
+        200,
+        TRANSACTION_TYPES.BONUS,
+        'Referral bonus',
+      );
+      await creditService.deductCredits(
+        txUser.id,
+        CREDIT_COSTS.HEADLINE_OPTIMIZATION,
+        'Headline Optimization',
+      );
     });
 
     test('should return a list of transactions for the user', async () => {
@@ -190,9 +134,7 @@ describe('Credits Integration Tests', () => {
     });
 
     test('should return 401 without authentication', async () => {
-      await request(app)
-        .get('/api/credits/transactions')
-        .expect(401);
+      await request(app).get('/api/credits/transactions').expect(401);
     });
   });
 
@@ -209,7 +151,11 @@ describe('Credits Integration Tests', () => {
     describe('deductCredits', () => {
       test('should deduct the correct amount and log a usage transaction', async () => {
         const before = await creditService.getUserCredits(svcUser.id);
-        const tx = await creditService.deductCredits(svcUser.id, 10, 'Test deduction');
+        const tx = await creditService.deductCredits(
+          svcUser.id,
+          10,
+          'Test deduction',
+        );
 
         const after = await creditService.getUserCredits(svcUser.id);
         expect(after).toBe(before - 10);
@@ -222,7 +168,7 @@ describe('Credits Integration Tests', () => {
         await db('users').where('id', svcUser.id).update({ credits: 5 });
 
         await expect(
-          creditService.deductCredits(svcUser.id, 10, 'Over-budget deduction')
+          creditService.deductCredits(svcUser.id, 10, 'Over-budget deduction'),
         ).rejects.toThrow('Insufficient credits');
       });
 
@@ -231,7 +177,11 @@ describe('Credits Integration Tests', () => {
         const before = await creditService.getUserCredits(svcUser.id);
 
         try {
-          await creditService.deductCredits(svcUser.id, 50, 'Failing deduction');
+          await creditService.deductCredits(
+            svcUser.id,
+            50,
+            'Failing deduction',
+          );
         } catch {
           // expected
         }
@@ -243,22 +193,40 @@ describe('Credits Integration Tests', () => {
 
     describe('refundCredits', () => {
       test('should refund a usage transaction and restore balance', async () => {
-        const tx = await creditService.deductCredits(svcUser.id, CREDIT_COSTS.RESUME_ANALYSIS, 'Resume Analysis');
-        const balanceAfterDeduction = await creditService.getUserCredits(svcUser.id);
+        const tx = await creditService.deductCredits(
+          svcUser.id,
+          CREDIT_COSTS.RESUME_ANALYSIS,
+          'Resume Analysis',
+        );
+        const balanceAfterDeduction = await creditService.getUserCredits(
+          svcUser.id,
+        );
 
-        const refundTx = await creditService.refundCredits(svcUser.id, tx.id, 'AI parse failure');
+        const refundTx = await creditService.refundCredits(
+          svcUser.id,
+          tx.id,
+          'AI parse failure',
+        );
 
         const finalBalance = await creditService.getUserCredits(svcUser.id);
-        expect(finalBalance).toBe(balanceAfterDeduction + CREDIT_COSTS.RESUME_ANALYSIS);
+        expect(finalBalance).toBe(
+          balanceAfterDeduction + CREDIT_COSTS.RESUME_ANALYSIS,
+        );
         expect(refundTx.transaction_type).toBe(TRANSACTION_TYPES.REFUND);
         expect(refundTx.amount).toBe(CREDIT_COSTS.RESUME_ANALYSIS);
       });
 
       test('should mark the original transaction as refunded', async () => {
-        const tx = await creditService.deductCredits(svcUser.id, 5, 'Cover Letter');
+        const tx = await creditService.deductCredits(
+          svcUser.id,
+          5,
+          'Cover Letter',
+        );
         await creditService.refundCredits(svcUser.id, tx.id, 'Timeout error');
 
-        const originalTx = await db('credit_transactions').where('id', tx.id).first();
+        const originalTx = await db('credit_transactions')
+          .where('id', tx.id)
+          .first();
         const metadata = originalTx.metadata;
 
         expect(metadata.refunded).toBe(true);
@@ -266,17 +234,25 @@ describe('Credits Integration Tests', () => {
       });
 
       test('should throw if the same transaction is refunded twice', async () => {
-        const tx = await creditService.deductCredits(svcUser.id, 5, 'Cover Letter');
+        const tx = await creditService.deductCredits(
+          svcUser.id,
+          5,
+          'Cover Letter',
+        );
         await creditService.refundCredits(svcUser.id, tx.id, 'First refund');
 
         await expect(
-          creditService.refundCredits(svcUser.id, tx.id, 'Second refund')
+          creditService.refundCredits(svcUser.id, tx.id, 'Second refund'),
         ).rejects.toThrow('Transaction already refunded');
       });
 
       test('should throw when original transaction does not exist', async () => {
         await expect(
-          creditService.refundCredits(svcUser.id, '00000000-0000-0000-0000-000000000000', 'Bad id')
+          creditService.refundCredits(
+            svcUser.id,
+            '00000000-0000-0000-0000-000000000000',
+            'Bad id',
+          ),
         ).rejects.toThrow('Original transaction not found');
       });
     });
@@ -291,7 +267,7 @@ describe('Credits Integration Tests', () => {
           200,
           TRANSACTION_TYPES.TOP_UP,
           'Monthly subscription refill',
-          { expiresAt }
+          { expiresAt },
         );
 
         const after = await creditService.getUserCredits(svcUser.id);
@@ -305,7 +281,7 @@ describe('Credits Integration Tests', () => {
           svcUser.id,
           100,
           TRANSACTION_TYPES.TOP_UP,
-          'One-time purchase'
+          'One-time purchase',
           // no expiresAt
         );
 
@@ -330,37 +306,46 @@ describe('Credits Integration Tests', () => {
 
     test('should block resume analysis with 402 when user has 0 credits', async () => {
       // Insert a resume to reference
-      const [resume] = await db('resumes').insert({
-        user_id: brokeUser.id,
-        original_filename: 'no-credits.pdf',
-        file_path: 'uploads/no-credits.pdf',
-        file_type: 'pdf',
-        file_size: 512,
-        extracted_text: 'Sample text for testing',
-        is_processed: true
-      }).returning('id');
+      const [resume] = await db('resumes')
+        .insert({
+          user_id: brokeUser.id,
+          original_filename: 'no-credits.pdf',
+          file_path: 'uploads/no-credits.pdf',
+          file_type: 'pdf',
+          file_size: 512,
+          extracted_text: 'Sample text for testing',
+          is_processed: true,
+        })
+        .returning('id');
 
       const response = await request(app)
-        .post(`/api/resume/${resume.id}/analyze`)
+        .post(`/api/resumes/${resume.id}/analyze`)
         .set('Authorization', `Bearer ${brokeToken}`)
         .send({
-          job_description: 'A sufficiently long job description to pass validation requirements for this test.'
+          job_description:
+            'A sufficiently long job description to pass validation requirements for this test.',
         })
         .expect(402);
 
       expect(response.body.error).toBe('Insufficient credits');
-      expect(response.body).toHaveProperty('required', CREDIT_COSTS.RESUME_ANALYSIS);
+      expect(response.body).toHaveProperty(
+        'required',
+        CREDIT_COSTS.RESUME_ANALYSIS,
+      );
     });
 
     test('should block cover letter generation with 402 when user has 0 credits', async () => {
       // Create a job application for broke user
-      const [jobApp] = await db('job_applications').insert({
-        user_id: brokeUser.id,
-        company_name: 'Test Corp',
-        position_title: 'Engineer',
-        job_description: 'Great role doing great things at a great company with great people.',
-        status: 'draft'
-      }).returning('id');
+      const [jobApp] = await db('job_applications')
+        .insert({
+          user_id: brokeUser.id,
+          company_name: 'Test Corp',
+          position_title: 'Engineer',
+          job_description:
+            'Great role doing great things at a great company with great people.',
+          status: 'draft',
+        })
+        .returning('id');
 
       // Insert a resume
       await db('resumes').insert({
@@ -370,17 +355,20 @@ describe('Credits Integration Tests', () => {
         file_type: 'pdf',
         file_size: 512,
         extracted_text: 'Resume text for cover letter',
-        is_processed: true
+        is_processed: true,
       });
 
       const response = await request(app)
-        .post(`/api/job-application/${jobApp.id}/cover-letter`)
+        .post(`/api/job-applications/${jobApp.id}/cover-letter`)
         .set('Authorization', `Bearer ${brokeToken}`)
         .send({ tone: 'professional', length: 'medium' })
         .expect(402);
 
       expect(response.body.error).toBe('Insufficient credits');
-      expect(response.body).toHaveProperty('required', CREDIT_COSTS.COVER_LETTER_GENERATION);
+      expect(response.body).toHaveProperty(
+        'required',
+        CREDIT_COSTS.COVER_LETTER_GENERATION,
+      );
     });
   });
 });

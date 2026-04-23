@@ -65,9 +65,9 @@
   },
   "lint-staged": {
     "*.js": [
-      "eslint --fix",
-      "prettier --write"
+      "npx eslint --fix",
+      "npx prettier --write"
     ],
-    "**/*": "prettier --write --ignore-unknown"
+    "**/*": "npx prettier --write --ignore-unknown"
   }
 }

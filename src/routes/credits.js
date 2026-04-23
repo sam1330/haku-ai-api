@@ -95,8 +95,10 @@ router.post(
   async (req, res) => {
     const secret = process.env.LEMON_SQUEEZY_WEBHOOK_SECRET;
     const signature = req.headers['x-signature'];
+    console.log('Received Lemon Squeezy webhook', req.header);
 
     if (!signature) {
+      console.log('Missing signature', signature);
       return res.status(401).send('Missing signature');
     }
 
@@ -108,10 +110,12 @@ router.post(
     try {
       isValid = crypto.timingSafeEqual(digest, signatureBuffer);
     } catch (e) {
+      console.error(e);
       // Ignore error
     }
 
     if (!isValid) {
+      console.log('Invalid signature');
       return res.status(401).send('Invalid signature');
     }
 

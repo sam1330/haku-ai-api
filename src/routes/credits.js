@@ -95,7 +95,7 @@ router.post(
   async (req, res) => {
     const secret = process.env.LEMON_SQUEEZY_WEBHOOK_SECRET;
     const signature = req.headers['x-signature'];
-    console.log('Received Lemon Squeezy webhook', req.header);
+    console.log('Received Lemon Squeezy webhook', req.headers);
 
     if (!signature) {
       console.log('Missing signature', signature);

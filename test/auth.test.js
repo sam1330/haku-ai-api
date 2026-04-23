@@ -7,6 +7,12 @@ const {
   runMigrations,
 } = require('./helpers');
 
+// jest.mock('../src/middleware/recaptcha', () => {
+//   return jest.fn(() => ({
+//     validateRecaptcha: jest.fn(),
+//   }));
+// });
+
 describe('Authentication Integration Tests', () => {
   beforeAll(async () => {
     await runMigrations();
@@ -23,6 +29,7 @@ describe('Authentication Integration Tests', () => {
       password: 'password123',
       first_name: 'John',
       last_name: 'Doe',
+      recaptcha_token: 'mock_token_for_testing'
     };
 
     test('should register a new user successfully', async () => {
@@ -58,6 +65,7 @@ describe('Authentication Integration Tests', () => {
     const userCredentials = {
       email: 'loginuser@example.com',
       password: 'password123',
+      recaptcha_token: 'mock_token_for_testing'
     };
 
     beforeAll(async () => {
@@ -103,6 +111,7 @@ describe('Authentication Integration Tests', () => {
         .send({
           email: userCredentials.email,
           password: 'wrongpassword',
+          recaptcha_token: 'mock_token_for_testing'
         })
         .expect(403);
     });
@@ -113,6 +122,7 @@ describe('Authentication Integration Tests', () => {
     const userCredentials = {
       email: 'loginuser@example.com',
       password: 'password123',
+      recaptcha_token: 'mock_token_for_testing'
     };
 
     beforeAll(async () => {
@@ -129,8 +139,9 @@ describe('Authentication Integration Tests', () => {
       await db('users').where('email', userCredentials.email).update(user);
 
       const response = await request(app).post('/api/auth/login').send({
-        email: 'loginuser@example.com',
-        password: 'password123',
+        email: userCredentials.email,
+        password: userCredentials.password,
+        recaptcha_token: 'mock_token_for_testing'
       });
       token = response.body.token;
     });
@@ -141,7 +152,7 @@ describe('Authentication Integration Tests', () => {
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
-      expect(response.body.user.email).toBe('loginuser@example.com');
+      expect(response.body.user.email).toBe(userCredentials.email);
     });
 
     test('should fail without token', async () => {

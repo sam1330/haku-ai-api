@@ -23,6 +23,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1030.0",
     "@google-cloud/vertexai": "^1.10.0",
+    "@lemonsqueezy/lemonsqueezy.js": "^4.0.0",
     "@sentry/node": "^10.49.0",
     "@sentry/profiling-node": "^10.49.0",
     "bcryptjs": "^2.4.3",
@@ -42,7 +43,6 @@
     "pg": "^8.11.3",
     "playwright": "^1.59.1",
     "resend": "^6.10.0",
-    "stripe": "^22.0.2",
     "supertest": "^7.2.2",
     "uuid": "^9.0.1"
   },
@@ -65,9 +65,9 @@
   },
   "lint-staged": {
     "*.js": [
-      "eslint --fix",
-      "prettier --write"
+      "npx eslint --fix",
+      "npx prettier --write"
     ],
-    "**/*": "prettier --write --ignore-unknown"
+    "**/*": "npx prettier --write --ignore-unknown"
   }
 }

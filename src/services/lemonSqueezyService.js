@@ -33,7 +33,7 @@ const createCheckoutSession = async (locale = 'en', userId, planKey) => {
   const { data, error } = await createCheckout(storeId, variantId, {
     checkoutData: {
       custom: {
-        userId: userId,
+        user_id: userId,
         plan_name: plan.name,
         credits: plan.credits.toString(),
         locale: locale,

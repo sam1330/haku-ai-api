@@ -126,13 +126,14 @@ router.post(
       if (eventName === 'order_created') {
         const order = event.data.attributes;
         const customData = event.meta.custom_data;
+        console.log("Event", event);
 
-        if (!customData || !customData.userId) {
+        if (!customData || !customData.user_id) {
           console.log('No custom data found in webhook, ignoring.');
           return res.json({ received: true });
         }
 
-        const { userId, plan_name, credits } = customData;
+        const { user_id, plan_name, credits } = customData;
         const orderId = event.data.id;
         const customerId = order.customer_id;
 
@@ -149,7 +150,7 @@ router.post(
 
           // Mark pending payment as succeeded or insert a new one
           const pendingPayment = await trx('payments')
-            .where({ user_id: userId, status: 'pending', plan_name })
+            .where({ user_id: user_id, status: 'pending', plan_name })
             .first();
 
           if (pendingPayment) {
@@ -166,7 +167,7 @@ router.post(
               });
           } else {
             await trx('payments').insert({
-              user_id: userId,
+              user_id: user_id,
               lemonsqueezy_checkout_id: orderId,
               amount: order.total,
               currency: order.currency,
@@ -182,7 +183,7 @@ router.post(
 
           // Add credits
           await creditService.addCredits(
-            userId,
+            user_id,
             parseInt(credits),
             TRANSACTION_TYPES.TOP_UP,
             `Lemon Squeezy Top-up: ${plan_name}`,
@@ -195,12 +196,12 @@ router.post(
 
           // Update user's customer id
           await trx('users')
-            .where('id', userId)
+            .where('id', user_id)
             .update({ lemonsqueezy_customer_id: customerId.toString() });
         });
 
         console.log(
-          `Successfully processed Lemon Squeezy order for user ${userId}, plan ${plan_name}`,
+          `Successfully processed Lemon Squeezy order for user ${user_id}, plan ${plan_name}`,
         );
       }
 

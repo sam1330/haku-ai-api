@@ -101,7 +101,7 @@ router.post(
     }
 
     const hmac = crypto.createHmac('sha256', secret);
-    const digest = Buffer.from(hmac.update(req.body).digest('hex'), 'utf8');
+    const digest = Buffer.from(hmac.update(req.rawBody).digest('hex'), 'utf8');
     const signatureBuffer = Buffer.from(signature, 'utf8');
 
     let isValid = false;
@@ -115,7 +115,7 @@ router.post(
       return res.status(401).send('Invalid signature');
     }
 
-    const event = JSON.parse(req.body.toString());
+    const event = JSON.parse(req.rawBody.toString());
     const eventName = event.meta.event_name;
 
     try {

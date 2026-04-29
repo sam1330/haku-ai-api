@@ -5,6 +5,7 @@ const {
   validate,
   resumeAnalysisSchema,
   resumeSchema,
+  resumeOptimizationSchema,
 } = require('../middleware/validation');
 const fileService = require('../services/fileService');
 const aiService = require('../services/aiService');
@@ -174,14 +175,15 @@ router.post(
 
 // Optimize resume
 router.post(
-  '/optimize',
+  '/:resume_id/optimize',
   authenticateToken,
   checkCredits('RESUME_OPTIMIZATION'),
-  validate(resumeAnalysisSchema),
+  validate(resumeOptimizationSchema),
   async (req, res, next) => {
     try {
-      const { job_description, target_role } = req.body;
-      const { resume_id } = req.query;
+      const { job_description, target_role, target_company } = req.body;
+      const { resume_id } = req.params;
+      const locale = req.headers['x-locale'] || 'en';
 
       if (!resume_id) {
         return res.status(400).json({
@@ -203,19 +205,21 @@ router.post(
         });
       }
 
-      if (!resume.extracted_text) {
+      if (!resume.metadata) {
         return res.status(400).json({
-          error: 'Resume text not available for optimization',
+          error: 'Resume metadata not available for optimization',
           code: 'NO_RESUME_TEXT',
         });
       }
 
       // Perform AI optimization
       const optimizationResult = await aiService.optimizeResume(
-        resume.extracted_text,
+        resume.metadata,
         job_description,
         target_role,
+        target_company,
         req.user.id,
+        locale,
       );
 
       // Log AI request
@@ -576,6 +580,7 @@ router.post(
       );
 
       const response = await aiService.analyzeResumeInstantaneous(text, locale);
+
       res.json({
         analysis: response.analysis,
       });

@@ -560,6 +560,8 @@ router.post(
   '/public/grade',
   fileService.getMulterConfig().single('resume'),
   async (req, res) => {
+    const locale = req.headers['x-locale'] || 'en';
+
     try {
       if (!req.file) {
         return res.status(422).json({
@@ -573,7 +575,7 @@ router.post(
         fileService.getFileTypeFromMimeType(req.file.mimetype),
       );
 
-      const response = await aiService.analyzeResumeInstantaneous(text);
+      const response = await aiService.analyzeResumeInstantaneous(text, locale);
       res.json({
         analysis: response.analysis,
       });

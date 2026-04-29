@@ -3,7 +3,10 @@
  */
 const validateRecaptcha = async (req, res, next) => {
   // Skip reCAPTCHA check in test environment if needed
-  if (process.env.NODE_ENV === 'test') {
+  if (
+    process.env.NODE_ENV === 'test' ||
+    process.env.NODE_ENV === 'development'
+  ) {
     return next();
   }
 

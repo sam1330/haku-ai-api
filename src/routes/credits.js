@@ -95,7 +95,6 @@ router.post(
   async (req, res) => {
     const secret = process.env.LEMON_SQUEEZY_WEBHOOK_SECRET;
     const signature = req.headers['x-signature'];
-    console.log('Received Lemon Squeezy webhook', req.headers);
 
     if (!signature) {
       console.log('Missing signature', signature);
@@ -126,7 +125,6 @@ router.post(
       if (eventName === 'order_created') {
         const order = event.data.attributes;
         const customData = event.meta.custom_data;
-        console.log("Event", event);
 
         if (!customData || !customData.user_id) {
           console.log('No custom data found in webhook, ignoring.');

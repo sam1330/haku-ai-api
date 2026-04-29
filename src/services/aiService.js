@@ -23,8 +23,13 @@ class AIService {
     });
     // Using gemini-1.5-flash as a cost-effective alternative to GPT-4
     this.modelName = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
-    this.model = this.vertexAI.preview.getGenerativeModel({
+    this.simpleModelName =
+      process.env.SIMPLE_GEMINI_MODEL || 'gemini-2.5-flash';
+    this.mainModel = this.vertexAI.preview.getGenerativeModel({
       model: this.modelName,
+    });
+    this.simpleModel = this.vertexAI.preview.getGenerativeModel({
+      model: this.simpleModelName,
     });
   }
 
@@ -87,7 +92,7 @@ class AIService {
         },
       };
 
-      const result = await this.model.generateContent(request);
+      const result = await this.mainModel.generateContent(request);
       const response = await result.response;
       console.log('Response:', response);
       const analysis = JSON.parse(response.candidates[0].content.parts[0].text);
@@ -108,6 +113,57 @@ class AIService {
       if (userId && creditTx) {
         await creditService.refundCredits(userId, creditTx.id, error.message);
       }
+      console.error('AI Resume Analysis Error:', error);
+      throw new Error('Failed to analyze resume: ' + error.message);
+    }
+  }
+
+  async analyzeResumeInstantaneous(resumeText, locale) {
+    try {
+      const prompt = this.buildInstantResumeAnalysisPrompt(resumeText, locale);
+
+      const request = {
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        systemInstruction: {
+          role: 'system',
+          parts: [
+            {
+              text: `You are an expert resume analyst and career coach. Analyze resumes for ATS compatibility, keyword optimization, and overall effectiveness for an instantaneous analysis. Provide only a quick (but informative) tip for improvement and a score from 1-10. Be extremely concise. Do not over-extend the response, try to keep it under 200 words. You MUST generate the analysis in the following language: ${LOCALES[locale]}.`,
+            },
+          ],
+        },
+        generationConfig: {
+          maxOutputTokens: 1200,
+          temperature: 0.3,
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: 'object',
+            required: ['tip', 'atsScore'],
+            properties: {
+              tip: { type: 'string' },
+              atsScore: { type: 'number' },
+            },
+          },
+        },
+      };
+
+      const result = await this.simpleModel.generateContent(request);
+      const response = await result.response;
+      const analysis = JSON.parse(response.candidates[0].content.parts[0].text);
+
+      const usageMetadata = response.usageMetadata;
+      const tokensUsed =
+        (usageMetadata.promptTokenCount || 0) +
+        (usageMetadata.candidatesTokenCount || 0);
+      const cost = this.calculateCost(tokensUsed, this.simpleModelName);
+
+      return {
+        analysis,
+        tokensUsed,
+        cost,
+        model: this.simpleModelName,
+      };
+    } catch (error) {
       console.error('AI Resume Analysis Error:', error);
       throw new Error('Failed to analyze resume: ' + error.message);
     }
@@ -158,7 +214,7 @@ class AIService {
         },
       };
 
-      const result = await this.model.generateContent(request);
+      const result = await this.mainModel.generateContent(request);
       const response = await result.response;
       const coverLetter = response.candidates[0].content.parts[0].text;
 
@@ -220,7 +276,7 @@ class AIService {
         },
       };
 
-      const result = await this.model.generateContent(request);
+      const result = await this.mainModel.generateContent(request);
       const response = await result.response;
       const optimizedResume = response.candidates[0].content.parts[0].text;
 
@@ -250,6 +306,7 @@ class AIService {
     jobDescription,
     targetRole,
     targetCompany,
+    locale = 'en',
   ) {
     let prompt = `Please analyze this resume for the following job description:\n\n`;
     prompt += `JOB DESCRIPTION:\n${jobDescription}\n\n`;
@@ -270,7 +327,21 @@ class AIService {
     prompt += `5. Specific Improvement Recommendations\n`;
     prompt += `6. Overall Strengths and Weaknesses\n`;
     prompt += `Format your response as a structured analysis with clear sections.`;
-    prompt += `You must generate the analysis in the following language: ${LOCALES['en']}.`;
+    prompt += `You must generate the analysis in the following language: ${LOCALES[locale]}.`;
+
+    return prompt;
+  }
+
+  buildInstantResumeAnalysisPrompt(resumeText, locale = 'en') {
+    let prompt = `Please analyze this resume for ATS compatibility and keyword optimization:\n\n`;
+
+    prompt += `\nRESUME TO ANALYZE:\n${resumeText}\n\n`;
+    prompt += `Please provide a comprehensive analysis including ONLY:\n`;
+    prompt += `1. ATS Compatibility Score (1-10) and specific issues\n`;
+    prompt += `3. Content Quality Assessment\n`;
+    prompt += `5. Specific Improvement Recommendations\n`;
+    prompt += `Format your response as a structured analysis with clear sections.`;
+    prompt += `You must generate the analysis in the following language: ${LOCALES[locale]}.`;
 
     return prompt;
   }

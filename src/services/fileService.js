@@ -97,6 +97,34 @@ class FileService {
     }
   }
 
+  async extractTextFromLocalFile(dataBuffer, fileType) {
+    // TODO finish the text extraction
+    try {
+      let extractedText = '';
+      let data = null;
+
+      const uint8Array = new Uint8Array(dataBuffer);
+
+      switch (fileType.toLowerCase()) {
+        case 'pdf':
+          data = new PDFParse(uint8Array);
+          extractedText = (await data.getText()).text;
+          break;
+        case 'docx':
+          data = await mammoth.extractRawText({ buffer: dataBuffer });
+          extractedText = data.value;
+          break;
+        default:
+          throw new Error(`Unsupported file type: ${fileType}`);
+      }
+
+      return this.cleanExtractedText(extractedText);
+    } catch (error) {
+      console.error('Text extraction error:', error);
+      throw new Error(`Failed to extract text from file: ${error.message}`);
+    }
+  }
+
   async extractFromPDF(fileKey) {
     try {
       const { Body } = await this.s3.send(

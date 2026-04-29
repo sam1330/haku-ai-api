@@ -555,4 +555,36 @@ router.post(
   },
 );
 
+// Analyze resume instantaneous
+router.post(
+  '/public/grade',
+  fileService.getMulterConfig().single('resume'),
+  async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(422).json({
+          error: 'No file uploaded',
+          code: 'NO_FILE',
+        });
+      }
+
+      const text = await fileService.extractTextFromLocalFile(
+        req.file.buffer,
+        fileService.getFileTypeFromMimeType(req.file.mimetype),
+      );
+
+      const response = await aiService.analyzeResumeInstantaneous(text);
+      res.json({
+        analysis: response.analysis,
+      });
+    } catch (error) {
+      console.log(error);
+      res.status(500).json({
+        error: error.message,
+        code: 'SERVER_ERROR',
+      });
+    }
+  },
+);
+
 module.exports = router;

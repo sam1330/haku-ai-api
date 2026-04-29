@@ -39,6 +39,13 @@ const resumeAnalysisSchema = Joi.object({
   target_company: Joi.string().min(2).max(100).optional(),
 });
 
+// Resume optimization validation schema
+const resumeOptimizationSchema = Joi.object({
+  target_role: Joi.string().min(2).max(100).optional(),
+  job_description: Joi.string().min(50).max(10000).required(),
+  target_company: Joi.string().min(2).max(100).optional(),
+});
+
 // Create resume validation schema
 const resumeSchema = Joi.object({
   original_filename: Joi.string().required(),
@@ -89,4 +96,5 @@ module.exports = {
   updateJobApplicationSchema,
   forgotPasswordSchema,
   resumeSchema,
+  resumeOptimizationSchema,
 };

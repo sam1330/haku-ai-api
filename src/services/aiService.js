@@ -240,10 +240,12 @@ class AIService {
   }
 
   async optimizeResume(
-    resumeText,
+    resumeMetadata,
     jobDescription,
     targetRole = null,
+    targetCompany = null,
     userId = null,
+    locale = 'en',
   ) {
     let creditTx = null;
     try {
@@ -255,9 +257,11 @@ class AIService {
         );
       }
       const prompt = this.buildResumeOptimizationPrompt(
-        resumeText,
+        resumeMetadata,
         jobDescription,
         targetRole,
+        targetCompany,
+        locale,
       );
 
       const request = {
@@ -266,19 +270,135 @@ class AIService {
           role: 'system',
           parts: [
             {
-              text: 'You are an expert resume optimizer. Rewrite and improve resume content to better match job requirements while maintaining authenticity and professional tone.',
+              text: `You are an expert resume optimizer. Rewrite and improve resume content to better match job requirements while maintaining authenticity and professional tone. You must generate the optimized resume in the following language: ${LOCALES[locale]}.`,
             },
           ],
         },
         generationConfig: {
-          maxOutputTokens: 3000,
+          maxOutputTokens: 10000,
           temperature: 0.3,
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: 'object',
+            required: ['name', 'location', 'email', 'phone', 'sections'],
+            properties: {
+              name: { type: 'string' },
+              location: { type: 'string' },
+              email: { type: 'string' },
+              phone: {
+                type: 'string',
+                description: 'Phone number in E.164 format (e.g., +1234567890)',
+              },
+              website: { type: 'string' },
+              social_networks: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  required: ['network', 'username'],
+                  properties: {
+                    network: { type: 'string' },
+                    username: { type: 'string' },
+                  },
+                },
+              },
+              sections: {
+                type: 'object',
+                required: [
+                  'summary',
+                  'experience',
+                  'education',
+                  'skills',
+                  'custom',
+                ],
+                properties: {
+                  summary: {
+                    type: 'array',
+                    items: { type: 'string' },
+                  },
+                  experience: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      required: [
+                        'company',
+                        'position',
+                        'location',
+                        'start_date',
+                        'end_date',
+                        'highlights',
+                      ],
+                      properties: {
+                        company: { type: 'string' },
+                        position: { type: 'string' },
+                        location: { type: 'string' },
+                        start_date: { type: 'string' },
+                        end_date: { type: 'string' },
+                        highlights: {
+                          type: 'array',
+                          items: { type: 'string' },
+                        },
+                      },
+                    },
+                  },
+                  education: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      required: [
+                        'institution',
+                        'area',
+                        'degree',
+                        'location',
+                        'start_date',
+                        'end_date',
+                      ],
+                      properties: {
+                        institution: { type: 'string' },
+                        area: { type: 'string' },
+                        degree: { type: 'string' },
+                        location: { type: 'string' },
+                        start_date: { type: 'string' },
+                        end_date: { type: 'string' },
+                      },
+                    },
+                  },
+                  skills: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      required: ['label', 'details'],
+                      properties: {
+                        label: { type: 'string' },
+                        details: { type: 'string' },
+                      },
+                    },
+                  },
+                  custom: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      required: ['title', 'content'],
+                      properties: {
+                        title: { type: 'string' },
+                        content: {
+                          type: 'array',
+                          items: { type: 'string' },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
         },
       };
 
       const result = await this.mainModel.generateContent(request);
       const response = await result.response;
-      const optimizedResume = response.candidates[0].content.parts[0].text;
+      const optimizedResume = JSON.parse(
+        response.candidates[0].content.parts[0].text,
+      );
 
       const usageMetadata = response.usageMetadata;
       const tokensUsed =
@@ -385,7 +505,13 @@ class AIService {
     return prompt;
   }
 
-  buildResumeOptimizationPrompt(resumeText, jobDescription, targetRole) {
+  buildResumeOptimizationPrompt(
+    resumeMetadata,
+    jobDescription,
+    targetRole,
+    locale = 'en',
+  ) {
+    const resume = resumeMetadata.cv;
     let prompt = `Please optimize this resume for the following job description:\n\n`;
     prompt += `JOB DESCRIPTION:\n${jobDescription}\n\n`;
 
@@ -393,14 +519,15 @@ class AIService {
       prompt += `TARGET ROLE: ${targetRole}\n`;
     }
 
-    prompt += `\nCURRENT RESUME:\n${resumeText}\n\n`;
+    prompt += `\nCURRENT RESUME METADATA:\n${resume}\n\n`;
     prompt += `Please provide an optimized version that:\n`;
     prompt += `1. Incorporates relevant keywords from the job description\n`;
     prompt += `2. Emphasizes experience that matches job requirements\n`;
     prompt += `3. Uses strong action verbs and quantifiable achievements\n`;
     prompt += `4. Maintains professional formatting and structure\n`;
     prompt += `5. Keeps the same overall content but improves presentation\n`;
-    prompt += `6. Ensures ATS compatibility\n`;
+    prompt += `6. Return the results in the following language: ${LOCALES[locale]}\n`;
+    prompt += `7. Ensures ATS compatibility\n`;
     prompt += `Return only the optimized resume content, no additional commentary.`;
 
     return prompt;

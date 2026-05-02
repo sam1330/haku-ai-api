@@ -23,8 +23,6 @@ describe('API Environment & Health', () => {
       .options('/health')
       .set('Origin', 'http://localhost:3000');
 
-    console.log(response);
-
     expect(response.status).toBe(204);
 
     expect(response.headers).toHaveProperty('access-control-allow-origin');

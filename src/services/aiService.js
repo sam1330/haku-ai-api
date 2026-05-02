@@ -56,7 +56,6 @@ class AIService {
         jobDescription,
         targetRole,
         targetCompany,
-        locale,
       );
 
       const request = {
@@ -65,7 +64,9 @@ class AIService {
           role: 'system',
           parts: [
             {
-              text: `You are an expert resume analyst and career coach. Analyze resumes for ATS compatibility, keyword optimization, and overall effectiveness. Provide specific, actionable feedback. Be extremely concise. Use bullet points within strings. Limit the overview to 3 sentences. Do not over-extend the response, try to keep it under 500 words. You MUST generate the analysis in the following language: ${LOCALES[locale]}.`,
+              text: `You are an expert resume analyst and career coach. Analyze resumes for ATS compatibility, keyword optimization, and overall effectiveness. 
+              Populate the JSON fields as follows — "overview": a 3-sentence summary of the candidate's fit; "strongPoints": an array of specific strengths and keyword matches; "weaknesses": an array of concrete gaps, ATS issues, missing keywords, and actionable fixes; "atsScore": a numeric score from 1 to 10. 
+              Be specific and concise — each array item should be one clear sentence. You MUST generate the analysis in the following language: ${LOCALES[locale]}.`,
             },
           ],
         },
@@ -87,6 +88,7 @@ class AIService {
                 items: { type: 'string' },
               },
               atsScore: { type: 'number' },
+              recruiter_perspective: { type: 'string' },
             },
           },
         },
@@ -120,7 +122,7 @@ class AIService {
 
   async analyzeResumeInstantaneous(resumeText, locale) {
     try {
-      const prompt = this.buildInstantResumeAnalysisPrompt(resumeText, locale);
+      const prompt = this.buildInstantResumeAnalysisPrompt(resumeText);
 
       const request = {
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
@@ -128,7 +130,9 @@ class AIService {
           role: 'system',
           parts: [
             {
-              text: `You are an expert resume analyst and career coach. Analyze resumes for ATS compatibility, keyword optimization, and overall effectiveness for an instantaneous analysis. Provide only a quick (but informative) tip for improvement and a score from 1-10. Be extremely concise. Do not over-extend the response, try to keep it under 200 words. You MUST generate the analysis in the following language: ${LOCALES[locale]}.`,
+              text: `You are an expert resume analyst. 
+              Given a resume, return a single specific, actionable tip that would most improve its ATS score, and a numeric ATS score from 1 to 10.
+              Be direct and concrete — one sentence for the tip. You MUST respond in the following language: ${LOCALES[locale]}.`,
             },
           ],
         },
@@ -195,7 +199,6 @@ class AIService {
         positionTitle,
         tone,
         length,
-        locale,
       );
 
       const request = {
@@ -270,7 +273,11 @@ class AIService {
           role: 'system',
           parts: [
             {
-              text: `You are an expert resume optimizer. Rewrite and improve resume content to better match job requirements while maintaining authenticity and professional tone. You must generate the optimized resume in the following language: ${LOCALES[locale]}.`,
+              text: `You are an expert resume optimizer. Your ONLY task is to improve the wording, phrasing, and keyword alignment of existing resume content to better match job requirements. 
+              You must NEVER invent, fabricate, or hallucinate any information. 
+              You must NEVER change personal information such as name, email, phone, location, website, or social network usernames — return them exactly as provided. 
+              You must NEVER add work experiences, companies, job titles, education institutions, degrees, dates, or skills that do not exist in the original resume. Only enhance the language of what already exists. 
+              You must generate the optimized resume in the following language: ${LOCALES[locale]}.`,
             },
           ],
         },
@@ -426,9 +433,8 @@ class AIService {
     jobDescription,
     targetRole,
     targetCompany,
-    locale = 'en',
   ) {
-    let prompt = `Please analyze this resume for the following job description:\n\n`;
+    let prompt = `Analyze the resume below against the provided job description.\n\n`;
     prompt += `JOB DESCRIPTION:\n${jobDescription}\n\n`;
 
     if (targetRole) {
@@ -438,30 +444,21 @@ class AIService {
       prompt += `TARGET COMPANY: ${targetCompany}\n`;
     }
 
-    prompt += `\nRESUME TO ANALYZE:\n${resumeText}\n\n`;
-    prompt += `Please provide a comprehensive analysis including:\n`;
-    prompt += `1. ATS Compatibility Score (1-10) and specific issues\n`;
-    prompt += `2. Keyword Match Analysis - missing important keywords\n`;
-    prompt += `3. Content Quality Assessment\n`;
-    prompt += `4. Format and Structure Issues\n`;
-    prompt += `5. Specific Improvement Recommendations\n`;
-    prompt += `6. Overall Strengths and Weaknesses\n`;
-    prompt += `Format your response as a structured analysis with clear sections.`;
-    prompt += `You must generate the analysis in the following language: ${LOCALES[locale]}.`;
+    prompt += `\nRESUME:\n${resumeText}\n\n`;
+    prompt += `Populate the JSON response fields:\n`;
+    prompt += `- "atsScore": rate ATS compatibility from 1 (poor) to 10 (excellent).\n`;
+    prompt += `- "overview": 3 sentences summarizing overall fit for the role.\n`;
+    prompt += `- "strongPoints": list each keyword match, relevant skill, and content strength as a separate item.\n`;
+    prompt += `- "weaknesses": list each ATS issue, missing keyword, content gap, and specific actionable fix as a separate item.\n`;
+    prompt += `Base every point strictly on the resume and job description provided — do not reference external assumptions.`;
 
     return prompt;
   }
 
-  buildInstantResumeAnalysisPrompt(resumeText, locale = 'en') {
-    let prompt = `Please analyze this resume for ATS compatibility and keyword optimization:\n\n`;
-
-    prompt += `\nRESUME TO ANALYZE:\n${resumeText}\n\n`;
-    prompt += `Please provide a comprehensive analysis including ONLY:\n`;
-    prompt += `1. ATS Compatibility Score (1-10) and specific issues\n`;
-    prompt += `3. Content Quality Assessment\n`;
-    prompt += `5. Specific Improvement Recommendations\n`;
-    prompt += `Format your response as a structured analysis with clear sections.`;
-    prompt += `You must generate the analysis in the following language: ${LOCALES[locale]}.`;
+  buildInstantResumeAnalysisPrompt(resumeText) {
+    let prompt = `Score this resume for ATS compatibility (1–10) and identify the single highest-impact improvement the candidate should make.\n\n`;
+    prompt += `RESUME:\n${resumeText}\n\n`;
+    prompt += `Populate "atsScore" with the numeric score and "tip" with one concrete, specific sentence describing the top improvement.`;
 
     return prompt;
   }
@@ -473,7 +470,6 @@ class AIService {
     positionTitle,
     tone,
     length,
-    locale = 'en',
   ) {
     const lengthInstructions = {
       short: 'Keep it concise (50-150 words)',
@@ -487,19 +483,18 @@ class AIService {
       enthusiastic: 'Use an energetic, passionate tone that shows excitement',
     };
 
-    let prompt = `Write a ${tone} cover letter in ${LOCALES[locale]} for the ${positionTitle} position at ${companyName}.\n\n`;
-    prompt += `TONE: ${toneInstructions[tone]}\n`;
-    prompt += `LENGTH: ${lengthInstructions[length]}\n\n`;
+    let prompt = `Write a cover letter for the ${positionTitle} position at ${companyName}.\n\n`;
+    prompt += `TONE: ${toneInstructions[tone] ?? 'Use a formal, professional tone'}\n`;
+    prompt += `LENGTH: ${lengthInstructions[length] ?? 'Write a standard length cover letter (150-250 words)'}\n\n`;
     prompt += `JOB DESCRIPTION:\n${jobDescription}\n\n`;
     prompt += `CANDIDATE'S RESUME:\n${resumeText}\n\n`;
     prompt += `Requirements:\n`;
     prompt += `- Address it to the hiring manager\n`;
-    prompt += `- Highlight 2-3 most relevant experiences from the resume\n`;
-    prompt += `- Show knowledge of the company/role\n`;
+    prompt += `- Highlight 2-3 of the candidate's most relevant experiences drawn directly from the resume above\n`;
+    prompt += `- Reference specific details from the job description to show understanding of the role — do not invent facts about the company\n`;
     prompt += `- Include a strong opening hook\n`;
     prompt += `- End with a clear call to action\n`;
-    prompt += `- Use specific examples and metrics where possible\n`;
-    prompt += `- Make it personalized and authentic\n`;
+    prompt += `- Only use achievements and metrics that appear in the resume — do not fabricate numbers or results\n`;
     prompt += `- Do not include placeholders like [Your Name] or [Date]`;
 
     return prompt;
@@ -512,23 +507,25 @@ class AIService {
     locale = 'en',
   ) {
     const resume = resumeMetadata.cv;
-    let prompt = `Please optimize this resume for the following job description:\n\n`;
+    const resumeContent =
+      typeof resume === 'object' ? JSON.stringify(resume, null, 2) : resume;
+
+    let prompt = `Optimize the following resume to better match the job description below.\n\n`;
     prompt += `JOB DESCRIPTION:\n${jobDescription}\n\n`;
 
     if (targetRole) {
-      prompt += `TARGET ROLE: ${targetRole}\n`;
+      prompt += `TARGET ROLE: ${targetRole}\n\n`;
     }
 
-    prompt += `\nCURRENT RESUME METADATA:\n${resume}\n\n`;
-    prompt += `Please provide an optimized version that:\n`;
-    prompt += `1. Incorporates relevant keywords from the job description\n`;
-    prompt += `2. Emphasizes experience that matches job requirements\n`;
-    prompt += `3. Uses strong action verbs and quantifiable achievements\n`;
-    prompt += `4. Maintains professional formatting and structure\n`;
-    prompt += `5. Keeps the same overall content but improves presentation\n`;
-    prompt += `6. Return the results in the following language: ${LOCALES[locale]}\n`;
-    prompt += `7. Ensures ATS compatibility\n`;
-    prompt += `Return only the optimized resume content, no additional commentary.`;
+    prompt += `ORIGINAL RESUME DATA (treat this as the single source of truth):\n${resumeContent}\n\n`;
+    prompt += `STRICT RULES — follow all of these without exception:\n`;
+    prompt += `1. Personal info is READ-ONLY: return name, email, phone, location, website, and social network usernames EXACTLY as they appear in the original — do not alter, correct, or reformat them.\n`;
+    prompt += `2. Do NOT invent or fabricate anything: never add companies, job titles, employers, education institutions, degrees, certifications, dates, or skills that are absent from the original data.\n`;
+    prompt += `3. Do NOT remove entries: every work experience, education item, skill, and custom section present in the original must appear in the output.\n`;
+    prompt += `4. Only improve wording: you may rewrite the summary, job highlight bullet points, and skill descriptions using strong action verbs and relevant keywords from the job description.\n`;
+    prompt += `5. Preserve all dates, company names, job titles, institution names, and degree names exactly as written in the original.\n`;
+    prompt += `6. Return the result in the following language: ${LOCALES[locale]}.\n`;
+    prompt += `Return only the optimized JSON object, no additional commentary.`;
 
     return prompt;
   }

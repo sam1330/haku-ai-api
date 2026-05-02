@@ -1,11 +1,8 @@
 process.env.NODE_ENV = 'test';
+process.env.RESEND_API_KEY = 'testTING';
 const request = require('supertest');
 const app = require('../src/server');
-const {
-  cleanDatabase,
-  db,
-  runMigrations,
-} = require('./helpers');
+const { cleanDatabase, db, runMigrations } = require('./helpers');
 
 // jest.mock('../src/middleware/recaptcha', () => {
 //   return jest.fn(() => ({
@@ -29,7 +26,7 @@ describe('Authentication Integration Tests', () => {
       password: 'password123',
       first_name: 'John',
       last_name: 'Doe',
-      recaptcha_token: 'mock_token_for_testing'
+      recaptcha_token: 'mock_token_for_testing',
     };
 
     test('should register a new user successfully', async () => {
@@ -57,7 +54,6 @@ describe('Authentication Integration Tests', () => {
         .post('/api/auth/register')
         .send(invalidUser)
         .expect(422);
-        
     });
   });
 
@@ -65,7 +61,7 @@ describe('Authentication Integration Tests', () => {
     const userCredentials = {
       email: 'loginuser@example.com',
       password: 'password123',
-      recaptcha_token: 'mock_token_for_testing'
+      recaptcha_token: 'mock_token_for_testing',
     };
 
     beforeAll(async () => {
@@ -80,7 +76,9 @@ describe('Authentication Integration Tests', () => {
     });
 
     test('should login successfully with correct credentials', async () => {
-      const user = await db('users').where('email', userCredentials.email).first();
+      const user = await db('users')
+        .where('email', userCredentials.email)
+        .first();
       user.email_verified_at = new Date();
       await db('users').where('email', userCredentials.email).update(user);
       const response = await request(app)
@@ -93,7 +91,9 @@ describe('Authentication Integration Tests', () => {
     });
 
     test('should fail with unverified email', async () => {
-      const user = await db('users').where('email', userCredentials.email).first();
+      const user = await db('users')
+        .where('email', userCredentials.email)
+        .first();
       user.email_verified_at = null;
       await db('users').where('email', userCredentials.email).update(user);
       const response = await request(app)
@@ -111,7 +111,7 @@ describe('Authentication Integration Tests', () => {
         .send({
           email: userCredentials.email,
           password: 'wrongpassword',
-          recaptcha_token: 'mock_token_for_testing'
+          recaptcha_token: 'mock_token_for_testing',
         })
         .expect(403);
     });
@@ -122,7 +122,7 @@ describe('Authentication Integration Tests', () => {
     const userCredentials = {
       email: 'loginuser@example.com',
       password: 'password123',
-      recaptcha_token: 'mock_token_for_testing'
+      recaptcha_token: 'mock_token_for_testing',
     };
 
     beforeAll(async () => {
@@ -134,14 +134,16 @@ describe('Authentication Integration Tests', () => {
           last_name: 'Test',
         });
 
-      const user = await db('users').where('email', userCredentials.email).first();
+      const user = await db('users')
+        .where('email', userCredentials.email)
+        .first();
       user.email_verified_at = new Date();
       await db('users').where('email', userCredentials.email).update(user);
 
       const response = await request(app).post('/api/auth/login').send({
         email: userCredentials.email,
         password: userCredentials.password,
-        recaptcha_token: 'mock_token_for_testing'
+        recaptcha_token: 'mock_token_for_testing',
       });
       token = response.body.token;
     });

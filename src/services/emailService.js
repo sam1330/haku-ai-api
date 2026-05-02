@@ -63,7 +63,7 @@ class EmailService {
       this.init();
     }
 
-    const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/forgot-password?token=${resetToken}`;
+    const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}`;
 
     const mailOptions = {
       from: `"${this.fromName}" <${this.fromEmail}>`,

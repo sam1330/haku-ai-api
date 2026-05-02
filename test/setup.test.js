@@ -13,9 +13,7 @@ describe('API Environment & Health', () => {
   });
 
   test('Health check endpoint should return 200', async () => {
-    const response = await request(app)
-      .get('/health')
-      .expect(200);
+    const response = await request(app).get('/health').expect(200);
 
     expect(response.body).toHaveProperty('status', 'OK');
   });
@@ -23,7 +21,9 @@ describe('API Environment & Health', () => {
   test('CORS should be configured', async () => {
     const response = await request(app)
       .options('/health')
-      .expect(204);
+      .set('Origin', 'http://localhost:3000');
+
+    expect(response.status).toBe(204);
 
     expect(response.headers).toHaveProperty('access-control-allow-origin');
   });
@@ -34,6 +34,8 @@ describe('API Environment & Health', () => {
 
   test('Database connection should be to test DB', async () => {
     const dbName = await db.raw('SELECT current_database()');
-    expect(dbName.rows[0].current_database).toBe(process.env.DB_TEST_NAME || 'resume_ai_test_db');
+    expect(dbName.rows[0].current_database).toBe(
+      process.env.DB_TEST_NAME || 'resume_ai_test_db',
+    );
   });
 });

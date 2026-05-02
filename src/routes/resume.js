@@ -160,11 +160,6 @@ router.post(
       res.json({
         message: 'Resume analysis completed',
         analysis: analysisResult.analysis,
-        metadata: {
-          tokens_used: analysisResult.tokensUsed,
-          cost: analysisResult.cost,
-          model: analysisResult.model,
-        },
         response: analysisResult.response,
       });
     } catch (error) {

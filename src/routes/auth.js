@@ -16,9 +16,53 @@ const { TRANSACTION_TYPES } = require('../config/constants');
 
 const router = express.Router();
 
-// Generate verification token
+const REFRESH_TOKEN_COOKIE = 'refresh_token';
+const REFRESH_TOKEN_EXPIRY_DAYS = 7;
+const ACCESS_TOKEN_EXPIRY = '15m';
+
 function generateVerificationToken() {
   return crypto.randomBytes(32).toString('hex');
+}
+
+function generateRefreshToken() {
+  return crypto.randomBytes(64).toString('hex');
+}
+
+function getRefreshTokenCookieOptions() {
+  return {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge: REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000,
+    path: '/api/auth',
+  };
+}
+
+async function issueTokens(res, user) {
+  const accessToken = jwt.sign(
+    { userId: user.id, email: user.email },
+    process.env.JWT_SECRET,
+    { expiresIn: ACCESS_TOKEN_EXPIRY },
+  );
+
+  const refreshToken = generateRefreshToken();
+  const expiresAt = new Date(
+    Date.now() + REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000,
+  );
+
+  await db('refresh_tokens').insert({
+    user_id: user.id,
+    token: refreshToken,
+    expires_at: expiresAt,
+  });
+
+  res.cookie(
+    REFRESH_TOKEN_COOKIE,
+    refreshToken,
+    getRefreshTokenCookieOptions(),
+  );
+
+  return accessToken;
 }
 
 // Register
@@ -156,12 +200,7 @@ router.post(
         .where('id', user.id)
         .update({ last_login_at: new Date() });
 
-      // Generate JWT token
-      const token = jwt.sign(
-        { userId: user.id, email: user.email },
-        process.env.JWT_SECRET,
-        { expiresIn: process.env.JWT_EXPIRES_IN || '7d' },
-      );
+      const token = await issueTokens(res, user);
 
       res.json({
         message: 'Login successful',
@@ -373,8 +412,8 @@ router.post(
 
       // Update user
       await db('users').where('id', user.id).update({
-        email_verification_token: verificationToken,
-        email_verification_token_expires_at: verificationTokenExpiry,
+        password_reset_token: verificationToken,
+        password_reset_expires_at: verificationTokenExpiry,
       });
 
       // Send Email
@@ -403,14 +442,106 @@ router.post(
   },
 );
 
-// Logout (client-side token removal, but we can track it)
+router.post('/reset-password', async (req, res, next) => {
+  try {
+    const { token, password } = req.body;
+
+    if (!token || !password) {
+      return res.status(400).json({
+        error: 'Token and password are required',
+        code: 'MISSING_TOKEN_PASSWORD',
+      });
+    }
+
+    // Find user with this verification token
+    const user = await db('users').where('password_reset_token', token).first();
+
+    if (!user) {
+      return res.status(400).json({
+        error: 'Invalid verification token',
+        code: 'INVALID_TOKEN',
+      });
+    }
+
+    // Check if token has expired
+    if (user.password_reset_expires_at < new Date()) {
+      return res.status(400).json({
+        error: 'Verification token has expired',
+        code: 'TOKEN_EXPIRED',
+      });
+    }
+
+    // Hash password
+    const saltRounds = 12;
+    const passwordHash = await bcrypt.hash(password, saltRounds);
+
+    // Update password
+    await db('users')
+      .where('id', user.id)
+      .update({ password_hash: passwordHash });
+
+    res.json({
+      message: 'Password reset successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Refresh access token
+router.post('/refresh', async (req, res, next) => {
+  try {
+    const token = req.cookies[REFRESH_TOKEN_COOKIE];
+    if (!token) {
+      return res.status(401).json({
+        error: 'No refresh token provided',
+        code: 'MISSING_REFRESH_TOKEN',
+      });
+    }
+
+    const stored = await db('refresh_tokens').where('token', token).first();
+
+    if (!stored || new Date(stored.expires_at) < new Date()) {
+      res.clearCookie(REFRESH_TOKEN_COOKIE, { path: '/api/auth' });
+      return res.status(401).json({
+        error: 'Invalid or expired refresh token',
+        code: 'INVALID_REFRESH_TOKEN',
+      });
+    }
+
+    const user = await db('users')
+      .select('id', 'email', 'is_active')
+      .where('id', stored.user_id)
+      .first();
+
+    if (!user || !user.is_active) {
+      await db('refresh_tokens').where('token', token).delete();
+      res.clearCookie(REFRESH_TOKEN_COOKIE, { path: '/api/auth' });
+      return res.status(401).json({
+        error: 'User not found or deactivated',
+        code: 'USER_INACTIVE',
+      });
+    }
+
+    // Rotate refresh token
+    await db('refresh_tokens').where('token', token).delete();
+    const newAccessToken = await issueTokens(res, user);
+
+    res.json({ token: newAccessToken });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Logout
 router.post('/logout', authenticateToken, async (req, res, next) => {
   try {
-    // In a more sophisticated setup, you might want to blacklist the token
-    // For now, we'll just return success
-    res.json({
-      message: 'Logout successful',
-    });
+    const token = req.cookies[REFRESH_TOKEN_COOKIE];
+    if (token) {
+      await db('refresh_tokens').where('token', token).delete();
+    }
+    res.clearCookie(REFRESH_TOKEN_COOKIE, { path: '/api/auth' });
+    res.json({ message: 'Logout successful' });
   } catch (error) {
     next(error);
   }
@@ -466,12 +597,7 @@ router.post('/verify-email', async (req, res, next) => {
       email_verification_token_expires_at: null,
     });
 
-    // Generate JWT token now that email is verified
-    const jwtToken = jwt.sign(
-      { userId: user.id, email: user.email },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' },
-    );
+    const jwtToken = await issueTokens(res, user);
 
     res.json({
       message: 'Email verified successfully',

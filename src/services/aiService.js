@@ -3,6 +3,7 @@ const db = require('../config/database');
 const dotenv = require('dotenv');
 const creditService = require('./creditService');
 const { CREDIT_COSTS, LOCALES } = require('../config/constants');
+const { getCurrentLocaleStringDate } = require('../utils');
 dotenv.config();
 
 class AIService {
@@ -66,7 +67,9 @@ class AIService {
             {
               text: `You are an expert resume analyst and career coach. Analyze resumes for ATS compatibility, keyword optimization, and overall effectiveness. 
               Populate the JSON fields as follows — "overview": a 3-sentence summary of the candidate's fit; "strongPoints": an array of specific strengths and keyword matches; "weaknesses": an array of concrete gaps, ATS issues, missing keywords, and actionable fixes; "atsScore": a numeric score from 1 to 10. 
-              Be specific and concise — each array item should be one clear sentence. You MUST generate the analysis in the following language: ${LOCALES[locale]}.`,
+              Be specific and concise — each array item should be one clear sentence. You MUST generate the analysis in the following language: ${LOCALES[locale]}.
+              [The current date is: ${getCurrentLocaleStringDate()}]
+              `,
             },
           ],
         },
@@ -132,7 +135,9 @@ class AIService {
             {
               text: `You are an expert resume analyst. 
               Given a resume, return a single specific, actionable tip that would most improve its ATS score, and a numeric ATS score from 1 to 10.
-              Be direct and concrete — one sentence for the tip. You MUST respond in the following language: ${LOCALES[locale]}.`,
+              Be direct and concrete — one sentence for the tip. You MUST respond in the following language: ${LOCALES[locale]}.
+              [The current date is: ${getCurrentLocaleStringDate()}]
+              `,
             },
           ],
         },
@@ -207,7 +212,11 @@ class AIService {
           role: 'system',
           parts: [
             {
-              text: `You are a professional career coach and cover letter expert. Write compelling, personalized cover letters that highlight relevant experience and demonstrate genuine interest in the role. You must generate the cover letter in the following language: ${LOCALES[locale]}.`,
+              text: `You are a professional career coach and cover letter expert. 
+              Write compelling, personalized cover letters that highlight relevant experience and demonstrate genuine interest in the role. 
+              You must generate the cover letter in the following language: ${LOCALES[locale]}.
+              [The current date is: ${getCurrentLocaleStringDate()}]
+              `,
             },
           ],
         },
@@ -277,7 +286,9 @@ class AIService {
               You must NEVER invent, fabricate, or hallucinate any information. 
               You must NEVER change personal information such as name, email, phone, location, website, or social network usernames — return them exactly as provided. 
               You must NEVER add work experiences, companies, job titles, education institutions, degrees, dates, or skills that do not exist in the original resume. Only enhance the language of what already exists. 
-              You must generate the optimized resume in the following language: ${LOCALES[locale]}.`,
+              You must generate the optimized resume in the following language: ${LOCALES[locale]}.
+              [The current date is: ${getCurrentLocaleStringDate()}].
+              `,
             },
           ],
         },

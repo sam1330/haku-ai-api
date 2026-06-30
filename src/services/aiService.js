@@ -1,9 +1,9 @@
-const { VertexAI } = require('@google-cloud/vertexai');
 const db = require('../config/database');
 const dotenv = require('dotenv');
 const creditService = require('./creditService');
 const { CREDIT_COSTS, LOCALES } = require('../config/constants');
-const { getCurrentLocaleStringDate } = require('../utils');
+const { getCurrentLocaleStringDate, parseModelJSON } = require('../utils');
+const { GoogleGenAI } = require('@google/genai');
 dotenv.config();
 
 class AIService {
@@ -18,29 +18,25 @@ class AIService {
       console.warn('GCP_PROJECT_ID is not set. AI services will fail.');
     }
 
-    this.vertexAI = new VertexAI({
+    this.ai = new GoogleGenAI({
+      vertexai: true,
       project: this.project,
       location: this.location,
     });
+
     // Using gemini-1.5-flash as a cost-effective alternative to GPT-4
     this.modelName = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
     this.simpleModelName =
       process.env.SIMPLE_GEMINI_MODEL || 'gemini-2.5-flash';
-    this.mainModel = this.vertexAI.preview.getGenerativeModel({
-      model: this.modelName,
-    });
-    this.simpleModel = this.vertexAI.preview.getGenerativeModel({
-      model: this.simpleModelName,
-    });
   }
 
   async analyzeResume(
     resumeText,
     jobDescription,
+    locale,
     targetRole = null,
     targetCompany = null,
     userId = null,
-    locale,
   ) {
     let creditTx = null;
     try {
@@ -60,6 +56,7 @@ class AIService {
       );
 
       const request = {
+        model: this.modelName,
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
         systemInstruction: {
           role: 'system',
@@ -97,10 +94,9 @@ class AIService {
         },
       };
 
-      const result = await this.mainModel.generateContent(request);
-      const response = await result.response;
+      const response = await this.ai.models.generateContent(request);
       console.log('Response:', response);
-      const analysis = JSON.parse(response.candidates[0].content.parts[0].text);
+      const analysis = parseModelJSON(response.text);
 
       const usageMetadata = response.usageMetadata;
       const tokensUsed =
@@ -128,12 +124,13 @@ class AIService {
       const prompt = this.buildInstantResumeAnalysisPrompt(resumeText);
 
       const request = {
+        model: this.simpleModelName,
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
         systemInstruction: {
           role: 'system',
           parts: [
             {
-              text: `You are an expert resume analyst. 
+              text: `You are an expert resume analyst.
               Given a resume, return a single specific, actionable tip that would most improve its ATS score, and a numeric ATS score from 1 to 10.
               Be direct and concrete — one sentence for the tip. You MUST respond in the following language: ${LOCALES[locale]}.
               [The current date is: ${getCurrentLocaleStringDate()}]
@@ -156,9 +153,8 @@ class AIService {
         },
       };
 
-      const result = await this.simpleModel.generateContent(request);
-      const response = await result.response;
-      const analysis = JSON.parse(response.candidates[0].content.parts[0].text);
+      const response = await this.ai.models.generateContent(request);
+      const analysis = parseModelJSON(response.text);
 
       const usageMetadata = response.usageMetadata;
       const tokensUsed =
@@ -207,6 +203,7 @@ class AIService {
       );
 
       const request = {
+        model: this.modelName,
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
         systemInstruction: {
           role: 'system',
@@ -226,9 +223,8 @@ class AIService {
         },
       };
 
-      const result = await this.mainModel.generateContent(request);
-      const response = await result.response;
-      const coverLetter = response.candidates[0].content.parts[0].text;
+      const response = await this.ai.models.generateContent(request);
+      const coverLetter = response.text;
 
       const usageMetadata = response.usageMetadata;
       const tokensUsed =
@@ -277,6 +273,7 @@ class AIService {
       );
 
       const request = {
+        model: this.modelName,
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
         systemInstruction: {
           role: 'system',
@@ -412,11 +409,8 @@ class AIService {
         },
       };
 
-      const result = await this.mainModel.generateContent(request);
-      const response = await result.response;
-      const optimizedResume = JSON.parse(
-        response.candidates[0].content.parts[0].text,
-      );
+      const response = await this.ai.models.generateContent(request);
+      const optimizedResume = parseModelJSON(response.text);
 
       const usageMetadata = response.usageMetadata;
       const tokensUsed =

@@ -79,7 +79,13 @@ const getCurrentLocaleStringDate = () => {
   return `${month} ${day}, ${year}`;
 };
 
+const parseModelJSON = (text) => {
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+  return JSON.parse(fenced ? fenced[1].trim() : text.trim());
+};
+
 module.exports = {
   getRecentActivity,
   getCurrentLocaleStringDate,
+  parseModelJSON,
 };

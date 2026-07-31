@@ -8,14 +8,14 @@ module.exports = {
       port: process.env.DB_PORT || 5432,
       user: process.env.DB_USER || 'postgres',
       password: process.env.DB_PASSWORD || 'password',
-      database: process.env.DB_NAME || 'resume_ai_db'
+      database: process.env.DB_NAME || 'resume_ai_db',
     },
     migrations: {
-      directory: './src/migrations'
+      directory: './src/migrations',
     },
     seeds: {
-      directory: './src/seeds'
-    }
+      directory: './src/seeds',
+    },
   },
 
   test: {
@@ -25,31 +25,31 @@ module.exports = {
       port: process.env.DB_PORT || 5432,
       user: process.env.DB_USER || 'postgres',
       password: process.env.DB_PASSWORD || 'password',
-      database: process.env.DB_TEST_NAME || 'resume_ai_test_db'
+      database: process.env.DB_TEST_NAME || 'resume_ai_test_db',
     },
     migrations: {
-      directory: './src/migrations'
+      directory: './src/migrations',
     },
     seeds: {
-      directory: './src/seeds'
-    }
+      directory: './src/seeds',
+    },
   },
 
   production: {
     client: 'pg',
     connection: {
       connectionString: process.env.DB_URL,
-      ssl: { rejectUnauthorized: false }
+      ssl: { rejectUnauthorized: false },
     },
     migrations: {
-      directory: './src/migrations'
+      directory: './src/migrations',
     },
     seeds: {
-      directory: './src/seeds'
+      directory: './src/seeds',
     },
     pool: {
       min: 2,
-      max: 10
-    }
-  }
+      max: 10,
+    },
+  },
 };

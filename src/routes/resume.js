@@ -242,6 +242,93 @@ router.post(
   },
 );
 
+// Convert an uploaded resume (text-only) into structured, editable builder data
+router.post(
+  '/:resume_id/convert',
+  authenticateToken,
+  checkCredits('RESUME_BUILDING'),
+  async (req, res, next) => {
+    try {
+      const { resume_id } = req.params;
+      const locale = req.headers['x-locale'] || 'en';
+
+      const resume = await db('resumes')
+        .where('id', resume_id)
+        .where('user_id', req.user.id)
+        .first();
+
+      if (!resume) {
+        return res.status(404).json({
+          error: 'Resume not found',
+          code: 'RESUME_NOT_FOUND',
+        });
+      }
+
+      if (resume.metadata) {
+        return res.status(400).json({
+          error: 'Resume is already editable',
+          code: 'ALREADY_EDITABLE',
+        });
+      }
+
+      if (!resume.extracted_text) {
+        return res.status(400).json({
+          error: 'No extracted text available for this resume',
+          code: 'NO_RESUME_TEXT',
+        });
+      }
+
+      const result = await aiService.extractResumeStructure(
+        resume.extracted_text,
+        req.user.id,
+      );
+
+      const metadata = {
+        cv: result.extractedCv,
+        design: {
+          theme: 'classic',
+          typography: {
+            font_family: {
+              body: 'serif',
+              name: 'serif',
+              section_titles: 'serif',
+              headline: 'serif',
+            },
+          },
+        },
+        locale: { language: locale === 'es' ? 'spanish' : 'english' },
+      };
+
+      const [updated] = await db('resumes')
+        .where('id', resume_id)
+        .update({
+          metadata,
+          source: enums.RESUME_SOURCE_TYPES.BUILDER,
+          updated_at: new Date(),
+        })
+        .returning('*');
+
+      await aiService.logAIRequest(
+        req.user.id,
+        'resume_conversion',
+        { resume_id },
+        { cv: result.extractedCv },
+        result.tokensUsed,
+        result.cost,
+      );
+
+      delete updated.extracted_text;
+
+      res.json({
+        message: 'Resume converted to editable successfully',
+        resume: updated,
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
 // Get user's resumes
 router.get('/', authenticateToken, async (req, res, next) => {
   try {

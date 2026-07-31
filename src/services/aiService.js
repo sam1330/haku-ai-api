@@ -6,6 +6,63 @@ const { getCurrentLocaleStringDate, parseModelJSON } = require('../utils');
 const { GoogleGenAI } = require('@google/genai');
 dotenv.config();
 
+// LLM structured output isn't guaranteed to match responseSchema exactly (e.g. it may
+// wrap personal fields under "personal_information" instead of returning them flat).
+// Coerce whatever comes back into the exact shape the frontend's ResumeData zod schema
+// requires, so a schema drift degrades to empty fields instead of crashing the builder.
+const toArray = (value) => (Array.isArray(value) ? value : []);
+
+const normalizeExtractedCv = (raw) => {
+  const source = raw && typeof raw === 'object' ? raw : {};
+  const personal =
+    source.personal_information ||
+    source.personal_info ||
+    source.contact_information ||
+    source;
+  const sections = source.sections || source;
+
+  return {
+    name: personal.name ?? source.name ?? '',
+    location: personal.location ?? source.location ?? '',
+    email: personal.email ?? source.email ?? '',
+    phone: personal.phone ?? source.phone ?? '',
+    website: personal.website ?? source.website ?? '',
+    social_networks: toArray(
+      personal.social_networks ?? source.social_networks,
+    ).map((sn) => ({
+      network: sn?.network ?? '',
+      username: sn?.username ?? '',
+    })),
+    sections: {
+      summary: toArray(sections.summary),
+      experience: toArray(sections.experience).map((exp) => ({
+        company: exp?.company ?? '',
+        position: exp?.position ?? '',
+        location: exp?.location ?? '',
+        start_date: exp?.start_date ?? '',
+        end_date: exp?.end_date ?? '',
+        highlights: toArray(exp?.highlights),
+      })),
+      education: toArray(sections.education).map((edu) => ({
+        institution: edu?.institution ?? '',
+        area: edu?.area ?? '',
+        degree: edu?.degree ?? '',
+        location: edu?.location ?? '',
+        start_date: edu?.start_date ?? '',
+        end_date: edu?.end_date ?? '',
+      })),
+      skills: toArray(sections.skills).map((skill) => ({
+        label: skill?.label ?? '',
+        details: skill?.details ?? '',
+      })),
+      custom: toArray(sections.custom).map((custom) => ({
+        title: custom?.title ?? '',
+        content: toArray(custom?.content),
+      })),
+    },
+  };
+};
+
 class AIService {
   constructor() {
     this.project = process.env.GCP_PROJECT_ID;
@@ -433,6 +490,184 @@ class AIService {
     }
   }
 
+  async extractResumeStructure(resumeText, userId = null) {
+    let creditTx = null;
+    try {
+      if (userId) {
+        creditTx = await creditService.deductCredits(
+          userId,
+          CREDIT_COSTS.RESUME_BUILDING,
+          'Resume Conversion to Editable',
+        );
+      }
+      const prompt = this.buildResumeExtractionPrompt(resumeText);
+
+      const request = {
+        model: this.modelName,
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        systemInstruction: {
+          role: 'system',
+          parts: [
+            {
+              text: `You are an expert resume parser. Extract every piece of structured data that is visibly present in the resume text — this is a transcription and segmentation task, not a rewrite.
+              "Never invent" means never add a fact that isn't in the source (a company, a date, a skill that doesn't appear). It does NOT mean you should leave a field blank when the information is clearly there but just isn't labeled with a tag like "email:" — resumes never label their fields that way, so you must recognize them by pattern. Leaving a visible value blank is just as wrong as inventing one.
+              Preserve the original language and wording of the resume — do not translate or rephrase, only segment it into fields. Section headings may be in a different language than the body (e.g. Spanish headings like "RESUMEN PROFESIONAL"/"EXPERIENCIA"/"EDUCACIÓN"/"HABILIDADES" over English or Spanish content) — map them to the right field by meaning, not by exact header text.
+              The source text often comes from automated PDF extraction and may have no line breaks, so entries run together in one paragraph. Use these patterns to segment it:
+              - Contact line (usually right after the name): fields separated by "•", "|", or commas. A token with "@" is the email. A token starting with "+" or containing mostly digits is the phone — normalize it to E.164 (e.g. "+1 (829) 301- 7378" becomes "+18293017378"; strip spaces, dashes, and parentheses, keep only the leading "+" and digits). A token containing a domain (.com, .dev, .io, "github.io", etc.) or starting with "http" is the website.
+              - Each experience entry usually reads like "COMPANY | POSITION  START_DATE – END_DATE  LOCATION" followed by one or more achievement sentences before the next company begins — split those into company, position, start_date, end_date, location, and one highlight string per achievement sentence.
+              - Each skills line usually reads like "CATEGORY: item1, item2, item3" — CATEGORY is the "label", the rest of the line is the "details" string.
+              - The professional summary is the paragraph right after the summary/objective heading (in any language) and before the first section like experience — capture it as one or more strings in "summary".
+              If a field genuinely has no corresponding value anywhere in the source text, return an empty string ("") for scalar fields or an empty array ([]) for list fields.
+              Dates should be normalized to "YYYY-MM" when a month and year are both available, "YYYY" when only a year is available, and "present" for an ongoing role — otherwise keep the original text.
+              [The current date is: ${getCurrentLocaleStringDate()}].
+              `,
+            },
+          ],
+        },
+        generationConfig: {
+          maxOutputTokens: 8000,
+          temperature: 0.1,
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: 'object',
+            required: ['name', 'location', 'email', 'phone', 'sections'],
+            properties: {
+              name: { type: 'string' },
+              location: { type: 'string' },
+              email: { type: 'string' },
+              phone: {
+                type: 'string',
+                description: 'Phone number in E.164 format (e.g., +1234567890)',
+              },
+              website: { type: 'string' },
+              social_networks: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  required: ['network', 'username'],
+                  properties: {
+                    network: { type: 'string' },
+                    username: { type: 'string' },
+                  },
+                },
+              },
+              sections: {
+                type: 'object',
+                required: [
+                  'summary',
+                  'experience',
+                  'education',
+                  'skills',
+                  'custom',
+                ],
+                properties: {
+                  summary: {
+                    type: 'array',
+                    items: { type: 'string' },
+                  },
+                  experience: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      required: [
+                        'company',
+                        'position',
+                        'location',
+                        'start_date',
+                        'end_date',
+                        'highlights',
+                      ],
+                      properties: {
+                        company: { type: 'string' },
+                        position: { type: 'string' },
+                        location: { type: 'string' },
+                        start_date: { type: 'string' },
+                        end_date: { type: 'string' },
+                        highlights: {
+                          type: 'array',
+                          items: { type: 'string' },
+                        },
+                      },
+                    },
+                  },
+                  education: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      required: [
+                        'institution',
+                        'area',
+                        'degree',
+                        'location',
+                        'start_date',
+                        'end_date',
+                      ],
+                      properties: {
+                        institution: { type: 'string' },
+                        area: { type: 'string' },
+                        degree: { type: 'string' },
+                        location: { type: 'string' },
+                        start_date: { type: 'string' },
+                        end_date: { type: 'string' },
+                      },
+                    },
+                  },
+                  skills: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      required: ['label', 'details'],
+                      properties: {
+                        label: { type: 'string' },
+                        details: { type: 'string' },
+                      },
+                    },
+                  },
+                  custom: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      required: ['title', 'content'],
+                      properties: {
+                        title: { type: 'string' },
+                        content: {
+                          type: 'array',
+                          items: { type: 'string' },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      };
+
+      const response = await this.ai.models.generateContent(request);
+      const extractedCv = normalizeExtractedCv(parseModelJSON(response.text));
+
+      const usageMetadata = response.usageMetadata;
+      const tokensUsed =
+        (usageMetadata.promptTokenCount || 0) +
+        (usageMetadata.candidatesTokenCount || 0);
+      const cost = this.calculateCost(tokensUsed, this.modelName);
+
+      return {
+        extractedCv,
+        tokensUsed,
+        cost,
+        model: this.modelName,
+      };
+    } catch (error) {
+      if (userId && creditTx) {
+        await creditService.refundCredits(userId, creditTx.id, error.message);
+      }
+      console.error('AI Resume Extraction Error:', error);
+      throw new Error('Failed to convert resume: ' + error.message);
+    }
+  }
+
   buildResumeAnalysisPrompt(
     resumeText,
     jobDescription,
@@ -531,6 +766,66 @@ class AIService {
     prompt += `5. Preserve all dates, company names, job titles, institution names, and degree names exactly as written in the original.\n`;
     prompt += `6. Return the result in the following language: ${LOCALES[locale]}.\n`;
     prompt += `Return only the optimized JSON object, no additional commentary.`;
+
+    return prompt;
+  }
+
+  buildResumeExtractionPrompt(resumeText) {
+    let prompt = `Extract the structured contents of the resume below into the JSON schema provided.\n\n`;
+    prompt += `The source text was extracted from a PDF by an automated tool, so it often has no line breaks and runs sections together. Segment it carefully — do not skip a field just because it isn't clearly delimited; scan the whole surrounding text for it.\n\n`;
+    prompt += `WORKED EXAMPLE — this shows how to segment run-on text like the resume below:\n\n`;
+    prompt += `Given this input fragment:\n`;
+    prompt += `"JOHN SMITH San Francisco, CA • +1 (415) 555- 0199 • john.smith@email.com • johnsmith.dev/portfolio SUMMARY Backend engineer with 6 years of experience shipping distributed systems at scale. EXPERIENCE Acme Corp | Senior Backend Engineer 2021-03 – PRESENT REMOTE Led a team of 4 engineers to redesign the billing pipeline, cutting invoice errors by 35%. Migrated legacy services to a microservices architecture using Docker and Kubernetes. EDUCATION State University | Bachelor en Computer Science Boston, MA 2013-09 – 2017-06 SKILLS Programming Languages: Java, Kotlin, Go Cloud & DevOps: AWS, Terraform, Jenkins"\n\n`;
+    prompt += `The correct extraction is:\n`;
+    prompt += JSON.stringify(
+      {
+        name: 'JOHN SMITH',
+        location: 'San Francisco, CA',
+        email: 'john.smith@email.com',
+        phone: '+14155550199',
+        website: 'johnsmith.dev/portfolio',
+        social_networks: [],
+        sections: {
+          summary: [
+            'Backend engineer with 6 years of experience shipping distributed systems at scale.',
+          ],
+          experience: [
+            {
+              company: 'Acme Corp',
+              position: 'Senior Backend Engineer',
+              location: 'REMOTE',
+              start_date: '2021-03',
+              end_date: 'present',
+              highlights: [
+                'Led a team of 4 engineers to redesign the billing pipeline, cutting invoice errors by 35%.',
+                'Migrated legacy services to a microservices architecture using Docker and Kubernetes.',
+              ],
+            },
+          ],
+          education: [
+            {
+              institution: 'State University',
+              area: 'Computer Science',
+              degree: 'Bachelor',
+              location: 'Boston, MA',
+              start_date: '2013-09',
+              end_date: '2017-06',
+            },
+          ],
+          skills: [
+            { label: 'Programming Languages', details: 'Java, Kotlin, Go' },
+            { label: 'Cloud & DevOps', details: 'AWS, Terraform, Jenkins' },
+          ],
+          custom: [],
+        },
+      },
+      null,
+      2,
+    );
+    prompt += `\n\nNotice how: the contact line's 4th token (a domain-like string) became "website" even though nothing labeled it as one; the phone lost its spacing/parens and gained the country code digits only; "POSITION" was pulled from between the "|" and the date even with no delimiter after it; every sentence between the location and the next company became its own "highlights" entry; "DEGREE en/in AREA" split into separate "degree" and "area" fields; each "Category: items" skills line became one {label, details} object. Apply this same reasoning to every entry in the resume below — do not leave position, highlights, skills, or summary empty just because they aren't set off by clear punctuation.\n\n`;
+    prompt += `RESUME:\n${resumeText}\n\n`;
+    prompt += `Transcribe the content faithfully — do not invent, embellish, or translate anything, but do not leave a field blank when the information is visibly present in the text. `;
+    prompt += `Return only the JSON object, no additional commentary.`;
 
     return prompt;
   }

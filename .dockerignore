@@ -6,3 +6,6 @@ npm-debug.log
 README.md
 postgres_data
 uploads
+dist
+test
+scripts

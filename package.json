@@ -6,11 +6,11 @@
   "scripts": {
     "dev": "tsx watch src/server.js",
     "build": "tsc",
-    "start": "node dist/server.js",
+    "start": "node dist/src/server.js",
     "test": "jest --runInBand --forceExit",
     "test:db": "node scripts/test-db.js",
-    "migrate": "knex migrate:latest",
-    "seed": "knex seed:run",
+    "migrate": "npm run build && knex migrate:latest --knexfile ./dist/knexfile.js",
+    "seed": "npm run build && knex seed:run --knexfile ./dist/knexfile.js",
     "prepare": "husky"
   },
   "keywords": [

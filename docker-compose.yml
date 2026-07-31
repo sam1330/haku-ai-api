@@ -3,10 +3,10 @@ services:
     container_name: haku-ai-api
     build: .
     command: >
-      sh -c "npx knex migrate:latest --knexfile ./knexfile.js && 
+      sh -c "npx knex migrate:latest --knexfile ./dist/knexfile.js &&
              npm run start"
     ports:
-      - "3001:3001"
+      - '3001:3001'
     env_file:
       - .env
     environment:
@@ -30,9 +30,9 @@ services:
       - POSTGRES_PASSWORD=${DB_PASSWORD}
       - POSTGRES_DB=haku_api
     ports:
-      - "5432:5432"
+      - '5432:5432'
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -h 127.0.0.1"]
+      test: ['CMD-SHELL', 'pg_isready -U postgres -h 127.0.0.1']
       interval: 5s
       timeout: 5s
       retries: 5

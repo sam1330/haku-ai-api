@@ -102,3 +102,5 @@ tmp/
 temp/
 
 postgres_data
+# Build output
+dist

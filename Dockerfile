@@ -1,3 +1,18 @@
+# ---- Build stage: needs devDependencies (typescript) to produce ./dist ----
+FROM node:24-alpine AS builder
+
+WORKDIR /app
+
+COPY package*.json tsconfig.json ./
+
+RUN npm ci --ignore-scripts
+
+COPY knexfile.ts ./
+COPY src ./src
+
+RUN npm run build
+
+# ---- Runtime stage ----
 FROM node:24-alpine
 
 # 1. Install Chromium and the minimum libraries needed to run it
@@ -18,8 +33,8 @@ WORKDIR /app
 
 COPY package*.json ./
 
-RUN npm ci --only=production --ignore-scripts
+RUN npm ci --omit=dev --ignore-scripts
 
-COPY . .
+COPY --from=builder /app/dist ./dist
 
 EXPOSE 3001

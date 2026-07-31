@@ -1,4 +1,10 @@
+const path = require('node:path');
 require('dotenv').config();
+
+// Resolved from this file's location so the config works both from source
+// (./src/migrations) and from the compiled output (./dist/src/migrations).
+const migrations = { directory: path.join(__dirname, 'src', 'migrations') };
+const seeds = { directory: path.join(__dirname, 'src', 'seeds') };
 
 module.exports = {
   development: {
@@ -10,12 +16,8 @@ module.exports = {
       password: process.env.DB_PASSWORD || 'password',
       database: process.env.DB_NAME || 'resume_ai_db',
     },
-    migrations: {
-      directory: './src/migrations',
-    },
-    seeds: {
-      directory: './src/seeds',
-    },
+    migrations,
+    seeds,
   },
 
   test: {
@@ -27,12 +29,8 @@ module.exports = {
       password: process.env.DB_PASSWORD || 'password',
       database: process.env.DB_TEST_NAME || 'resume_ai_test_db',
     },
-    migrations: {
-      directory: './src/migrations',
-    },
-    seeds: {
-      directory: './src/seeds',
-    },
+    migrations,
+    seeds,
   },
 
   production: {
@@ -41,12 +39,8 @@ module.exports = {
       connectionString: process.env.DB_URL,
       ssl: { rejectUnauthorized: false },
     },
-    migrations: {
-      directory: './src/migrations',
-    },
-    seeds: {
-      directory: './src/seeds',
-    },
+    migrations,
+    seeds,
     pool: {
       min: 2,
       max: 10,

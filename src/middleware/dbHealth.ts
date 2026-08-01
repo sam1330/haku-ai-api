@@ -1,6 +1,12 @@
+import { Request, Response, NextFunction } from 'express';
+
 const db = require('../config/database');
 
-const checkDatabaseConnection = async (req, res, next) => {
+const checkDatabaseConnection = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
   try {
     // Simple query to check if database is accessible
     await db.raw('SELECT 1');

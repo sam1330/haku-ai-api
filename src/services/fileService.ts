@@ -1,31 +1,26 @@
-// import multer from 'multer';
-// import path from 'path';
-// import mammoth from 'mammoth';
-// import { v4 } from 'uuid';
-// import {
-//   S3Client,
-//   PutObjectCommand,
-//   DeleteObjectCommand,
-//   paginateListObjectsV2,
-//   GetObjectCommand,
-// } from '@aws-sdk/client-s3';
-// import { PDFParse } from 'pdf-parse';
+import {
+  S3Client,
+  PutObjectCommand,
+  DeleteObjectCommand,
+  GetObjectCommand,
+} from '@aws-sdk/client-s3';
+import type { FileFilterCallback } from 'multer';
 
 const multer = require('multer');
 const path = require('path');
 const mammoth = require('mammoth');
 const { v4 } = require('uuid');
-const {
-  S3Client,
-  PutObjectCommand,
-  DeleteObjectCommand,
-  GetObjectCommand,
-} = require('@aws-sdk/client-s3');
 const { PDFParse } = require('pdf-parse');
 
 class FileService {
+  maxFileSize: number;
+  allowedMimeTypes: string[];
+  s3!: S3Client;
+  bucket?: string;
+
   constructor() {
-    this.maxFileSize = parseInt(process.env.MAX_FILE_SIZE) || 10 * 1024 * 1024; // 10MB
+    this.maxFileSize =
+      parseInt(process.env.MAX_FILE_SIZE as string) || 10 * 1024 * 1024; // 10MB
     this.allowedMimeTypes = [
       'application/pdf',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -54,13 +49,17 @@ class FileService {
     // 1. Use memory storage instead of disk storage
     const storage = multer.memoryStorage();
 
-    const fileFilter = (req, file, cb) => {
+    const fileFilter = (
+      req: Express.Request,
+      file: Express.Multer.File,
+      cb: FileFilterCallback,
+    ) => {
       if (this.allowedMimeTypes.includes(file.mimetype)) {
         cb(null, true);
       } else {
+        // multer ignores the acceptFile arg once an error is passed
         cb(
           new Error('Invalid file type. Only PDF and DOCX files are allowed.'),
-          false,
         );
       }
     };
@@ -75,7 +74,10 @@ class FileService {
     });
   }
 
-  async extractTextFromFile(filePath, fileType) {
+  async extractTextFromFile(
+    filePath: string,
+    fileType: string,
+  ): Promise<string> {
     try {
       let extractedText = '';
 
@@ -93,11 +95,13 @@ class FileService {
       return this.cleanExtractedText(extractedText);
     } catch (error) {
       console.error('Text extraction error:', error);
-      throw new Error(`Failed to extract text from file: ${error.message}`);
+      throw new Error(
+        `Failed to extract text from file: ${(error as Error).message}`,
+      );
     }
   }
 
-  async extractTextFromLocalFile(dataBuffer, fileType) {
+  async extractTextFromLocalFile(dataBuffer: Buffer, fileType: string) {
     // TODO finish the text extraction
     try {
       let extractedText = '';
@@ -121,11 +125,13 @@ class FileService {
       return this.cleanExtractedText(extractedText);
     } catch (error) {
       console.error('Text extraction error:', error);
-      throw new Error(`Failed to extract text from file: ${error.message}`);
+      throw new Error(
+        `Failed to extract text from file: ${(error as Error).message}`,
+      );
     }
   }
 
-  async extractFromPDF(fileKey) {
+  async extractFromPDF(fileKey: string): Promise<string> {
     try {
       const { Body } = await this.s3.send(
         new GetObjectCommand({ Bucket: this.bucket, Key: fileKey }),
@@ -135,11 +141,11 @@ class FileService {
       const data = new PDFParse(dataBuffer);
       return (await data.getText()).text;
     } catch (error) {
-      throw new Error(`PDF extraction failed: ${error.message}`);
+      throw new Error(`PDF extraction failed: ${(error as Error).message}`);
     }
   }
 
-  async extractFromDOCX(fileKey) {
+  async extractFromDOCX(fileKey: string): Promise<string> {
     try {
       const { Body } = await this.s3.send(
         new GetObjectCommand({ Bucket: this.bucket, Key: fileKey }),
@@ -150,7 +156,7 @@ class FileService {
       const result = await mammoth.extractRawText({ buffer: buffer });
       return result.value;
     } catch (error) {
-      throw new Error(`DOCX extraction failed: ${error.message}`);
+      throw new Error(`DOCX extraction failed: ${(error as Error).message}`);
     }
   }
 
@@ -158,7 +164,8 @@ class FileService {
    * Enhanced extraction that captures both the section titles (headers)
    * and the content within them.
    */
-  extractTextFromBuilderCv(obj) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- recurses over an arbitrarily nested, dynamically-shaped CV JSON tree
+  extractTextFromBuilderCv(obj: any): string {
     let text = '';
 
     for (const key in obj) {
@@ -186,7 +193,7 @@ class FileService {
     return text.trim();
   }
 
-  cleanExtractedText(text) {
+  cleanExtractedText(text: string): string {
     if (!text) return '';
 
     return text
@@ -195,8 +202,8 @@ class FileService {
       .trim();
   }
 
-  getFileTypeFromMimeType(mimeType) {
-    const mimeToType = {
+  getFileTypeFromMimeType(mimeType: string): string {
+    const mimeToType: Record<string, string> = {
       'application/pdf': 'pdf',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
         'docx',
@@ -205,7 +212,11 @@ class FileService {
     return mimeToType[mimeType] || 'unknown';
   }
 
-  async storeFile(buffer, originalName, mimeType = 'application/pdf') {
+  async storeFile(
+    buffer: Buffer,
+    originalName: string,
+    mimeType = 'application/pdf',
+  ): Promise<string> {
     const key = `resumes/${this.generateUniqueFilename(originalName)}`;
 
     await this.s3.send(
@@ -220,7 +231,7 @@ class FileService {
     return key;
   }
 
-  async deleteFile(fileKey) {
+  async deleteFile(fileKey: string): Promise<boolean> {
     try {
       await this.s3.send(
         new DeleteObjectCommand({
@@ -235,19 +246,19 @@ class FileService {
     }
   }
 
-  validateFileSize(fileSize) {
+  validateFileSize(fileSize: number): boolean {
     return fileSize <= this.maxFileSize;
   }
 
-  validateFileType(mimeType) {
+  validateFileType(mimeType: string): boolean {
     return this.allowedMimeTypes.includes(mimeType);
   }
 
-  getFileExtension(filename) {
+  getFileExtension(filename: string): string {
     return path.extname(filename).toLowerCase();
   }
 
-  generateUniqueFilename(originalName) {
+  generateUniqueFilename(originalName: string): string {
     const ext = this.getFileExtension(originalName);
     return `${v4()}-${Date.now()}${ext}`;
   }

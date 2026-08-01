@@ -12,12 +12,12 @@ lemonSqueezySetup({
 
 /**
  * Creates a Lemon Squeezy Checkout Session for credit top-ups
- * @param {string} locale
- * @param {string} userId
- * @param {string} planKey (starter, grow, power)
- * @returns {Promise<Object>}
  */
-const createCheckoutSession = async (locale = 'en', userId, planKey) => {
+const createCheckoutSession = async (
+  locale = 'en',
+  userId: string,
+  planKey: string,
+) => {
   const plan = plans[planKey.toLowerCase()];
   if (!plan) {
     throw new Error('Invalid plan selected');

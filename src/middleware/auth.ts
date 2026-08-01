@@ -1,7 +1,13 @@
+import { Request, Response, NextFunction } from 'express';
+
 const jwt = require('jsonwebtoken');
 const db = require('../config/database');
 
-const authenticateToken = async (req, res, next) => {
+const authenticateToken = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
@@ -13,7 +19,9 @@ const authenticateToken = async (req, res, next) => {
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET) as {
+      userId: string;
+    };
 
     // Verify user still exists
     const user = await db('users').where('id', decoded.userId).first();
@@ -40,7 +48,7 @@ const authenticateToken = async (req, res, next) => {
 
     next();
   } catch (error) {
-    if (error.name === 'TokenExpiredError') {
+    if ((error as Error).name === 'TokenExpiredError') {
       return res.status(401).json({
         error: 'Token expired',
         code: 'TOKEN_EXPIRED',
@@ -55,7 +63,7 @@ const authenticateToken = async (req, res, next) => {
 };
 
 const requireSubscription = (subscriptionType = 'pro') => {
-  return (req, res, next) => {
+  return (req: Request, res: Response, next: NextFunction) => {
     const user = req.user;
 
     if (!user) {
@@ -86,7 +94,11 @@ const requireSubscription = (subscriptionType = 'pro') => {
 };
 
 // Middleware to require email verification
-const requireVerified = async (req, res, next) => {
+const requireVerified = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
   const user = req.user;
 
   if (!user) {

@@ -1,7 +1,17 @@
-// import { Resend } from 'resend';
-const { Resend } = require('resend');
+import { Resend } from 'resend';
+
+interface EmailResult {
+  success: boolean;
+  messageId?: string;
+  error?: string;
+}
 
 class EmailService {
+  transporter: Resend | null;
+  initialized: boolean;
+  fromName?: string;
+  fromEmail?: string;
+
   constructor() {
     this.transporter = null;
     this.initialized = false;
@@ -19,7 +29,12 @@ class EmailService {
     this.initialized = true;
   }
 
-  async sendVerificationEmail(email, firstName, verificationToken, locale) {
+  async sendVerificationEmail(
+    email: string,
+    firstName: string,
+    verificationToken: string,
+    locale?: string,
+  ): Promise<EmailResult> {
     if (!this.initialized) {
       this.init();
     }
@@ -58,7 +73,12 @@ class EmailService {
     }
   }
 
-  async sendPasswordResetEmail(email, firstName, resetToken, locale = 'en') {
+  async sendPasswordResetEmail(
+    email: string,
+    firstName: string,
+    resetToken: string,
+    locale = 'en',
+  ): Promise<EmailResult> {
     if (!this.initialized) {
       this.init();
     }
@@ -94,7 +114,11 @@ class EmailService {
     }
   }
 
-  _getVerificationEmailTemplate(firstName, verificationUrl, locale = 'en') {
+  _getVerificationEmailTemplate(
+    firstName: string,
+    verificationUrl: string,
+    locale = 'en',
+  ): string {
     if (locale === 'es') {
       return this._getVerificationEmailTemplateES(firstName, verificationUrl);
     }
@@ -156,7 +180,10 @@ class EmailService {
     `;
   }
 
-  _getVerificationEmailTemplateES(firstName, verificationUrl) {
+  _getVerificationEmailTemplateES(
+    firstName: string,
+    verificationUrl: string,
+  ): string {
     return `
       <!DOCTYPE html>
       <html>
@@ -215,7 +242,11 @@ class EmailService {
     `;
   }
 
-  _getPasswordResetEmailTemplate(firstName, resetUrl, locale = 'en') {
+  _getPasswordResetEmailTemplate(
+    firstName: string,
+    resetUrl: string,
+    locale = 'en',
+  ): string {
     if (locale === 'es') {
       return this._getPasswordResetEmailTemplateES(firstName, resetUrl);
     }
@@ -277,7 +308,10 @@ class EmailService {
     `;
   }
 
-  _getPasswordResetEmailTemplateES(firstName, resetUrl) {
+  _getPasswordResetEmailTemplateES(
+    firstName: string,
+    resetUrl: string,
+  ): string {
     return `
       <!DOCTYPE html>
       <html>

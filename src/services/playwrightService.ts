@@ -1,8 +1,8 @@
-// import { chromium } from 'playwright';
-const { chromium } = require('playwright');
-let browser; // Global or singleton browser instance
+import { chromium, Browser } from 'playwright';
 
-async function getBrowser() {
+let browser: Browser | undefined; // Global or singleton browser instance
+
+async function getBrowser(): Promise<Browser> {
   if (!browser) {
     browser = await chromium.launch({
       executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH, // Path from Dockerfile
@@ -16,7 +16,11 @@ async function getBrowser() {
   return browser;
 }
 
-async function generatePDF(resumeId, locale, authToken) {
+async function generatePDF(
+  resumeId: string,
+  locale: string,
+  authToken: string,
+): Promise<Buffer> {
   const instance = await getBrowser();
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
 

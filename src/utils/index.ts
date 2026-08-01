@@ -1,10 +1,17 @@
-// import db from '../config/database.js';
-// import enums from '../enums/index.js';
-
 const db = require('../config/database');
 const enums = require('../enums/index');
 
-const getRecentActivity = async (userId) => {
+interface Activity {
+  title: string;
+  type: string;
+  id: string;
+  description: string;
+  timestamp: Date | string;
+  has_analysis?: boolean;
+  status?: string;
+}
+
+const getRecentActivity = async (userId: string): Promise<Activity[]> => {
   // Get counts for different entities
   const [recentResumes, recentJobApplications, recentAIRequests] =
     await Promise.all([
@@ -65,7 +72,10 @@ const getRecentActivity = async (userId) => {
       timestamp: req.created_at,
     })),
   ]
-    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+    .sort(
+      (a, b) =>
+        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
+    )
     .slice(0, 10);
 
   return activities;
@@ -79,7 +89,7 @@ const getCurrentLocaleStringDate = () => {
   return `${month} ${day}, ${year}`;
 };
 
-const parseModelJSON = (text) => {
+const parseModelJSON = (text: string) => {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
   return JSON.parse(fenced ? fenced[1].trim() : text.trim());
 };

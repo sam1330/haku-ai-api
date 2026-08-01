@@ -1,8 +1,26 @@
-const errorHandler = (err, req, res) => {
+import { Request, Response } from 'express';
+
+interface AppError extends Error {
+  status?: number;
+  code?: string;
+  isValidationError?: boolean;
+  issues?: { path: (string | number)[]; message: string }[];
+  type?: string;
+}
+
+interface ErrorResponse {
+  message: string;
+  status: number;
+  code: string;
+  details?: { field: string; message: string }[];
+  stack?: string;
+}
+
+const errorHandler = (err: AppError, req: Request, res: Response) => {
   console.error('Error:', err);
 
   // Default error
-  let error = {
+  let error: ErrorResponse = {
     message: err.message || 'Internal Server Error',
     status: err.status || 500,
     code: err.code || 'INTERNAL_ERROR',
@@ -26,14 +44,14 @@ const errorHandler = (err, req, res) => {
   }
 
   // Validation errors
-  if (err.isJoi) {
+  if (err.isValidationError) {
     error = {
       message: 'Validation error',
       status: 400,
       code: 'VALIDATION_ERROR',
-      details: err.details.map((detail) => ({
-        field: detail.path.join('.'),
-        message: detail.message,
+      details: (err.issues || []).map((issue) => ({
+        field: issue.path.join('.'),
+        message: issue.message,
       })),
     };
   }

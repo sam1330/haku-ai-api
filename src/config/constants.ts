@@ -5,16 +5,16 @@ module.exports = {
     RESUME_OPTIMIZATION: 15,
     HEADLINE_OPTIMIZATION: 2,
     RESUME_BUILDING: 5,
-  },
+  } as const,
   TRANSACTION_TYPES: {
     TOP_UP: 'top-up',
     USAGE: 'usage',
     REFUND: 'refund',
     BONUS: 'bonus',
-  },
+  } as const,
   DEFAULT_WELCOME_CREDITS: 30,
   LOCALES: {
     es: 'Spanish',
     en: 'English',
-  },
+  } as const,
 };

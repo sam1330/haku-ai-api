@@ -1,4 +1,5 @@
-const knex = require('knex');
+import knex from 'knex';
+
 const knexConfig = require('../../knexfile');
 
 const environment = process.env.NODE_ENV || 'development';
@@ -16,14 +17,15 @@ const db = knex(config);
 const MAX_RETRIES = 10;
 const RETRY_DELAY = 5000;
 
-const connectWithRetry = async (retryCount = 0) => {
+const connectWithRetry = async (retryCount = 0): Promise<void> => {
   try {
     await db.raw('SELECT 1');
     console.log('✅ Database connected successfully');
   } catch (err) {
+    const error = err as Error;
     console.error(
       `❌ Database connection failed (attempt ${retryCount + 1}/${MAX_RETRIES}):`,
-      err.message,
+      error.message,
     );
 
     if (retryCount < MAX_RETRIES) {

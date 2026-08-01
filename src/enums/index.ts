@@ -7,9 +7,9 @@ module.exports = {
     JOB_APPLICATION: 'job_application',
     AI_REQUEST: 'ai_request',
     RESUME_UPLOAD: 'resume_upload',
-  },
+  } as const,
   RESUME_SOURCE_TYPES: {
     UPLOAD: 'upload',
     BUILDER: 'builder',
-  },
+  } as const,
 };

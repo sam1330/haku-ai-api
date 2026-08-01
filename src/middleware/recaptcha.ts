@@ -1,7 +1,19 @@
+import { Request, Response, NextFunction } from 'express';
+
+interface RecaptchaResponse {
+  success: boolean;
+  score: number;
+  'error-codes'?: string[];
+}
+
 /**
  * Middleware to validate Google reCAPTCHA v3 tokens
  */
-const validateRecaptcha = async (req, res, next) => {
+const validateRecaptcha = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
   // Skip reCAPTCHA check in test environment if needed
   if (
     process.env.NODE_ENV === 'test' ||
@@ -49,7 +61,7 @@ const validateRecaptcha = async (req, res, next) => {
       },
     );
 
-    const data = await response.json();
+    const data = (await response.json()) as RecaptchaResponse;
 
     if (!data.success) {
       console.warn('reCAPTCHA verification failed:', data['error-codes']);
@@ -70,7 +82,7 @@ const validateRecaptcha = async (req, res, next) => {
     }
 
     // Optionally store reCAPTCHA data in request for further use
-    req.recaptcha = data;
+    (req as Request & { recaptcha?: RecaptchaResponse }).recaptcha = data;
     next();
   } catch (error) {
     console.error('Error during reCAPTCHA verification:', error);

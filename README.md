@@ -1,95 +1,122 @@
-# AI-Powered Resume & Job Application Assistant - Backend
+# Haku AI — Resume & Job Application Assistant (Backend)
 
-A comprehensive Node.js backend for an AI-powered resume analysis and job application platform.
+A Node.js/TypeScript backend for an AI-powered resume analysis, resume building, and job application platform.
 
 ## Features
 
-- **User Authentication**: JWT-based authentication with user registration and login
-- **Resume Processing**: Upload and parse PDF/DOCX resumes with text extraction
-- **AI-Powered Analysis**: Resume analysis using OpenAI GPT-4 for ATS optimization
-- **Cover Letter Generation**: AI-generated personalized cover letters
-- **Resume Optimization**: AI-powered resume improvement suggestions
-- **Job Application Management**: Track and manage job applications
-- **Dashboard Analytics**: Usage statistics and activity tracking
-- **Subscription Management**: Free and Pro tier support
+- **Authentication**: Email/password auth with access + refresh tokens (httpOnly cookie), email verification, password reset, and Google reCAPTCHA v3 protection on sensitive endpoints
+- **Resume Processing**: Upload and parse PDF/DOCX resumes (text extraction via `pdf-parse` / `mammoth`), stored on AWS S3
+- **AI-Powered Analysis**: Resume analysis and ATS scoring using Google Gemini (Vertex AI)
+- **Resume Optimization & Building**: AI-assisted resume improvement and conversion of uploaded resumes into structured, editable builder data
+- **Resume PDF Generation**: Render a stored resume to a downloadable PDF (via Playwright / an external PDF engine)
+- **Public Resume Grading**: Unauthenticated endpoint to grade an uploaded resume instantly
+- **Cover Letter Generation**: AI-generated personalized cover letters tied to job applications
+- **Job Application Management**: Track and manage job applications and their status
+- **Dashboard Analytics**: Usage overview, AI usage stats, subscription status, and recent activity feed
+- **Credits & Billing**: Credit-based usage system with Lemon Squeezy checkout and webhook-driven credit top-ups
+- **Observability**: Sentry error tracking and performance profiling
 
 ## Tech Stack
 
-- **Runtime**: Node.js 18+
+- **Runtime**: Node.js 18+, TypeScript (project is mid-migration from JS to TS — both `.js` and `.ts` files exist under `src/`)
 - **Framework**: Express.js
-- **Database**: PostgreSQL with Knex.js ORM
-- **Authentication**: JWT (jsonwebtoken)
-- **File Processing**: multer, pdf-parse, mammoth
-- **AI Integration**: OpenAI GPT-4 API
-- **Validation**: Joi
-- **Security**: Helmet, CORS, Rate Limiting
+- **Database**: PostgreSQL with Knex.js (migrations + query builder)
+- **Authentication**: JWT access tokens + rotating refresh tokens, bcrypt password hashing
+- **File Processing**: multer, pdf-parse, mammoth, Playwright
+- **File Storage**: AWS S3 (`@aws-sdk/client-s3`)
+- **AI Integration**: Google Gemini via `@google/genai` (Vertex AI)
+- **Payments**: Lemon Squeezy (`@lemonsqueezy/lemonsqueezy.js`)
+- **Email**: Resend
+- **Validation**: Zod
+- **Security**: Helmet, CORS, rate limiting, reCAPTCHA v3
+- **Monitoring**: Sentry (`@sentry/node`, `@sentry/profiling-node`)
+- **Testing**: Jest + Supertest
 
 ## Prerequisites
 
 - Node.js 18 or higher
 - PostgreSQL 12 or higher
-- OpenAI API key
+- Google Cloud project with Vertex AI access (Gemini)
+- AWS S3 bucket + credentials
+- Lemon Squeezy account (for billing) and Resend account (for transactional email)
 
 ## Installation
 
 1. **Clone the repository**
+
    ```bash
    git clone <repository-url>
-   cd resume-ai-backend
+   cd haku-api
    ```
 
 2. **Install dependencies**
+
    ```bash
    npm install
    ```
 
 3. **Set up environment variables**
+
    ```bash
    cp env.example .env
    ```
-   
-   Update the `.env` file with your configuration:
+
+   Key variables to configure (see `env.example` for the full list):
+
    ```env
-   # Server Configuration
+   # Server
    PORT=3000
    NODE_ENV=development
 
-   # Database Configuration
-   DB_HOST=localhost
-   DB_PORT=5432
-   DB_NAME=resume_ai_db
-   DB_USER=your_db_user
-   DB_PASSWORD=your_db_password
+   # Database
+   DB_URL=postgresql://user:password@localhost:5432/resume_ai_db
+   # (or DB_HOST/DB_PORT/DB_NAME/DB_USER/DB_PASSWORD)
 
-   # JWT Configuration
+   # JWT
    JWT_SECRET=your_super_secret_jwt_key_here
    JWT_EXPIRES_IN=7d
 
-   # OpenAI Configuration
-   OPENAI_API_KEY=your_openai_api_key_here
+   # Google Cloud Vertex AI (Gemini)
+   GCP_PROJECT_ID=your_gcp_project_id
+   GCP_LOCATION=us-central1
+   GEMINI_MODEL=
+   SIMPLE_GEMINI_MODEL=
 
-   # Email Configuration (SMTP)
-   SMTP_HOST=smtp.gmail.com
-   SMTP_PORT=587
+   # AWS S3
+   AWS_REGION=
+   AWS_ACCESS_KEY_ID=
+   AWS_SECRET_ACCESS_KEY=
+   AWS_BUCKET_NAME=
+
+   # Email (Resend)
+   RESEND_API_KEY=
    SMTP_USER=your_email@gmail.com
-   SMTP_PASS=your_app_password
    SMTP_FROM_NAME=Haku AI Resume Assistant
 
-   # Frontend URL (for verification links)
+   # Frontend URL (for verification/reset links)
    FRONTEND_URL=http://localhost:3001
 
-   # File Upload Configuration
-   MAX_FILE_SIZE=10485760
-   UPLOAD_PATH=./uploads
+   # Lemon Squeezy
+   LEMON_SQUEEZY_API_KEY=
+   LEMON_SQUEEZY_STORE_ID=
+   LEMON_SQUEEZY_WEBHOOK_SECRET=
+   LEMON_SQUEEZY_STARTER_VARIANT_ID=
+   LEMON_SQUEEZY_PROFESSIONAL_VARIANT_ID=
+   LEMON_SQUEEZY_BUSINESS_VARIANT_ID=
+
+   # reCAPTCHA v3
+   RECAPTCHA_SECRET_KEY=your_recaptcha_secret_key
+   RECAPTCHA_MIN_SCORE=0.5
+
+   # Sentry
+   SENTRY_DSN=""
    ```
 
 4. **Set up the database**
+
    ```bash
-   # Create the database
-   createdb resume_ai_db
-   
-   # Run migrations
-   npm run migrate
+   npm run build
+   npx knex migrate:latest
    ```
 
 5. **Start the development server**
@@ -97,170 +124,119 @@ A comprehensive Node.js backend for an AI-powered resume analysis and job applic
    npm run dev
    ```
 
+### Running with Docker
+
+A `docker-compose.yml` is provided that builds the API image and starts a PostgreSQL 18 container, running migrations automatically on boot:
+
+```bash
+docker compose up --build
+```
+
+## Available Scripts
+
+- `npm run dev` — run the server with `tsx watch` (hot reload)
+- `npm run build` — compile TypeScript to `dist/`
+- `npm start` — run the compiled server from `dist/`
+- `npm test` — run the Jest test suite
+- `npm run test:db` — sanity-check the database connection
+- `npm run migrate` — build, then run Knex migrations
+- `npm run seed` — build, then run Knex seeds
+
 ## API Endpoints
 
-### Authentication
-- `POST /api/auth/register` - User registration (sends verification email)
-- `POST /api/auth/login` - User login (requires email verification)
-- `POST /api/auth/verify-email` - Verify email with token
-- `POST /api/auth/resend-verification` - Resend verification email
-- `GET /api/auth/verify-email/status` - Check verification status
-- `GET /api/auth/profile` - Get user profile
-- `PUT /api/auth/profile` - Update user profile
-- `PUT /api/auth/change-password` - Change password
-- `POST /api/auth/logout` - Logout
+### Authentication (`/api/auth`)
 
-### Resume Management
-- `POST /api/resumes/upload` - Upload resume (PDF/DOCX)
-- `POST /api/resumes/analyze` - Analyze resume with AI
-- `POST /api/resumes/optimize` - Optimize resume (Pro only)
-- `GET /api/resumes` - Get user's resumes
-- `GET /api/resumes/:id` - Get specific resume
-- `GET /api/resumes/:id/text` - Get resume text
-- `DELETE /api/resumes/:id` - Delete resume
+- `POST /register` — register (sends verification email, protected by reCAPTCHA)
+- `POST /login` — login (issues access token + refresh token cookie, requires verified email)
+- `POST /refresh` — rotate refresh token and issue a new access token
+- `POST /logout` — revoke refresh token
+- `POST /verify-email` — verify email with token
+- `POST /resend-verification` — resend verification email
+- `GET /verify-email/status` — check verification status
+- `POST /forgot-password` — send password reset email
+- `POST /reset-password` — reset password with token
+- `GET /profile` — get current user profile (includes recent credit transactions)
+- `PUT /profile` — update profile
+- `PUT /change-password` — change password
 
-### Job Applications
-- `POST /api/job-applications` - Create job application
-- `POST /api/job-applications/:id/cover-letter` - Generate cover letter
-- `GET /api/job-applications` - Get job applications
-- `GET /api/job-applications/:id` - Get specific application
-- `PUT /api/job-applications/:id` - Update application
-- `DELETE /api/job-applications/:id` - Delete application
-- `GET /api/job-applications/:id/cover-letter` - Get cover letter
+### Resumes (`/api/resumes`)
 
-### Dashboard
-- `GET /api/dashboard/overview` - Dashboard overview
-- `GET /api/dashboard/ai-usage` - AI usage statistics
-- `GET /api/dashboard/subscription` - Subscription status
-- `GET /api/dashboard/activity` - Recent activity feed
+- `POST /upload` — upload a resume (PDF/DOCX)
+- `POST /:resume_id/analyze` — analyze a resume with AI
+- `POST /:resume_id/optimize` — optimize a resume with AI
+- `POST /:resume_id/convert` — convert an uploaded resume into structured, editable builder data (costs credits)
+- `POST /:resume_id/generate` — generate a downloadable PDF from a resume
+- `GET /` — list the current user's resumes
+- `POST /` — create a resume (builder)
+- `PUT /:resume_id` — update a resume
+- `GET /:id` — get a specific resume
+- `GET /:id/analyses` — get a resume's analysis history
+- `GET /:id/text` — get extracted resume text
+- `DELETE /:id` — delete a resume
+- `POST /public/grade` — public, unauthenticated instant resume grading
+
+### Job Applications (`/api/job-applications`)
+
+- `POST /` — create a job application
+- `POST /:id/cover-letter` — generate an AI cover letter for the application
+- `GET /` — list job applications
+- `GET /:id` — get a specific application
+- `PUT /:id` — update an application
+- `DELETE /:id` — delete an application
+- `GET /:id/cover-letter` — get the generated cover letter
+
+### Dashboard (`/api/dashboard`)
+
+- `GET /overview` — dashboard overview
+- `GET /ai-usage` — AI usage statistics
+- `GET /subscription` — subscription status
+- `GET /activity` — recent activity feed
+
+### Credits & Billing (`/api/credits`)
+
+- `GET /balance` — get the current user's credit balance
+- `GET /transactions` — get credit transaction history
+- `POST /create-checkout-session` — create a Lemon Squeezy checkout session for a plan
+- `POST /webhook` — Lemon Squeezy webhook (order events, credits users on successful orders)
 
 ## Database Schema
 
-### Users Table
-- `id` (UUID, Primary Key)
-- `email` (String, Unique)
-- `password_hash` (String)
-- `first_name` (String)
-- `last_name` (String)
-- `subscription_type` (Enum: 'free', 'pro')
-- `subscription_expires_at` (Timestamp)
-- `is_active` (Boolean)
-- `created_at` (Timestamp)
-- `updated_at` (Timestamp)
+Schema is managed via Knex migrations in `src/migrations/`. Core tables:
 
-### Resumes Table
-- `id` (UUID, Primary Key)
-- `user_id` (UUID, Foreign Key)
-- `original_filename` (String)
-- `file_path` (String)
-- `file_type` (String)
-- `file_size` (Integer)
-- `extracted_text` (Text)
-- `analysis_results` (JSON)
-- `is_processed` (Boolean)
-- `created_at` (Timestamp)
-- `updated_at` (Timestamp)
+- **users** — account info, credentials, subscription/customer references, email verification & password reset tokens
+- **refresh_tokens** — rotating JWT refresh tokens per user
+- **resumes** — uploaded/created resumes, extracted text, structured builder metadata
+- **resume_analyses** — AI analysis results per resume
+- **job_applications** — job application tracking, status, generated cover letters
+- **ai_requests** — logs of AI calls (type, input/output, tokens, cost)
+- **credit_transactions** — credit debits/top-ups per user
+- **payments** — Lemon Squeezy checkout/order records
 
-### Job Applications Table
-- `id` (UUID, Primary Key)
-- `user_id` (UUID, Foreign Key)
-- `resume_id` (UUID, Foreign Key)
-- `company_name` (String)
-- `position_title` (String)
-- `job_description` (Text)
-- `application_url` (String)
-- `application_deadline` (Timestamp)
-- `status` (Enum: 'draft', 'applied', 'interview', 'rejected', 'accepted')
-- `notes` (Text)
-- `cover_letter_data` (JSON)
-- `created_at` (Timestamp)
-- `updated_at` (Timestamp)
+## Billing & Credits
 
-### AI Requests Table
-- `id` (UUID, Primary Key)
-- `user_id` (UUID, Foreign Key)
-- `request_type` (Enum: 'resume_analysis', 'cover_letter_generation', 'resume_optimization')
-- `input_data` (JSON)
-- `response_data` (JSON)
-- `status` (String)
-- `tokens_used` (Integer)
-- `cost` (Decimal)
-- `created_at` (Timestamp)
-- `updated_at` (Timestamp)
+The platform uses a credit-based model instead of fixed subscription tiers. Credits are purchased via Lemon Squeezy checkout and consumed by credit-gated AI actions (see `src/config/plans.ts` and `src/middleware/creditMiddleware.js`):
 
-## Subscription Tiers
+| Plan         | Credits | Price  |
+| ------------ | ------- | ------ |
+| Starter      | 100     | $10.00 |
+| Professional | 250     | $20.00 |
+| Business     | 600     | $50.00 |
 
-### Free Tier
-- 3 resume uploads
-- 5 job applications
-- 10 AI requests per month
-- Basic resume analysis
-- Cover letter generation
+## Project Structure
 
-### Pro Tier ($10-15/month)
-- Unlimited resume uploads
-- Unlimited job applications
-- Unlimited AI requests
-- Advanced resume analysis
-- Resume optimization
-- Priority support
-
-## Security Features
-
-- JWT-based authentication
-- Password hashing with bcrypt
-- **Email verification** - Users must verify their email before accessing the platform
-- Rate limiting
-- CORS protection
-- Helmet security headers
-- Input validation with Joi
-- File type and size validation
-
-## Error Handling
-
-Comprehensive error handling with:
-- Structured error responses
-- HTTP status codes
-- Error codes for client handling
-- Detailed logging
-- Graceful degradation
-
-## Development
-
-```bash
-# Run in development mode
-npm run dev
-
-# Run migrations
-npm run migrate
-
-# Run seeds
-npm run seed
-
-# Run tests
-npm test
 ```
-
-## Production Deployment
-
-1. Set up PostgreSQL database
-2. Configure environment variables
-3. Run database migrations
-4. Start the application with PM2 or similar process manager
-
-```bash
-# Production start
-npm start
+src/
+  config/       # database, plans, constants
+  enums/        # shared enums
+  middleware/   # auth, validation, rate limiting, recaptcha, error handling, db health
+  migrations/   # Knex migrations
+  routes/       # Express routers (auth, resume, jobApplication, dashboard, credits)
+  services/     # business logic (AI, credits, email, file storage, Lemon Squeezy, PDF)
+  types/        # shared TypeScript types
+  utils/        # helpers
+  server.js     # app entrypoint
 ```
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
 
 ## License
 
-MIT License - see LICENSE file for details
+MIT
